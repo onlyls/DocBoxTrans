@@ -35,9 +35,23 @@
 .
 ├── DocBoxTrans/           # Windows 端：稻壳阅读器划词翻译（C# / .NET Framework）
 ├── DocBoxTrans-Zotero/    # Zotero 端：Zotero 7+ 划词翻译插件（TypeScript）
+├── .github/workflows/     # GitHub Actions 发布工作流
 ├── LICENSE                # MIT
 └── README.md
 ```
+
+---
+
+## 发布
+
+发布通过 GitHub Actions（[.github/workflows/](.github/workflows/)）完成：
+
+| 目标 | 触发方式 | 产物 |
+| --- | --- | --- |
+| **桌面端** | 推送 `desktop-v*` 标签 | `DocBoxTrans-<tag>.zip`（含 `DocBoxTrans.exe`、`DocBoxTransConfig.exe` 与图标），挂到该标签的 Release |
+| **Zotero 插件** | 手动运行 `Release Zotero Plugin` 工作流 | `.xpi` 挂到 `v<version>` Release，并刷新 `release` 更新清单 Release 中的 `update.json` |
+
+> 插件发布前，先把 `DocBoxTrans-Zotero/package.json` 的 `version` 提升到目标版本并推送；工作流据此创建 / 更新对应 Release。
 
 ---
 

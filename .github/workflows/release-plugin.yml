@@ -1,0 +1,38 @@
+name: Release Zotero Plugin
+
+# 插件端（DocBoxTrans-Zotero）发布：手动触发
+# 说明：基于插件包版本（DocBoxTrans-Zotero/package.json 的 version）自动创建
+#   - `v<version>` Release，并上传 .xpi
+#   - `release` Release（更新清单），并上传 update.json（供自动更新读取）
+# 因此发布前需先把 package.json 的 version 提升到目标版本并推送，再手动运行本工作流。
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: DocBoxTrans-Zotero
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: DocBoxTrans-Zotero/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & release
+        run: npm run release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
