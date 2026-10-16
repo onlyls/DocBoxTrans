@@ -8,9 +8,9 @@ export default defineConfig({
   id: pkg.config.addonID,
   namespace: pkg.config.addonRef,
   updateURL:
-    "https://github.com/local/docboxtrans-zotero/releases/download/release/update.json",
+    "https://github.com/onlyls/DocBoxTrans/releases/download/release/update.json",
   xpiDownloadLink:
-    "https://github.com/local/docboxtrans-zotero/releases/download/v{{version}}/{{xpiName}}.xpi",
+    "https://github.com/onlyls/DocBoxTrans/releases/download/v{{version}}/{{xpiName}}.xpi",
 
   server: {
     asProxy: false,

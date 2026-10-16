@@ -17,11 +17,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/local/docboxtrans-zotero.git"
+    "url": "git+https://github.com/onlyls/DocBoxTrans.git"
   },
   "author": "DocBoxTrans",
   "license": "MIT",
-  "homepage": "https://github.com/local/docboxtrans-zotero#readme",
+  "homepage": "https://github.com/onlyls/DocBoxTrans#readme",
   "dependencies": {
     "esbuild": "^0.28.2",
     "zotero-plugin-toolkit": "^6.0.0"
