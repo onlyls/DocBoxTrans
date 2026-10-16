@@ -49,9 +49,9 @@
 | 目标 | 触发方式 | 产物 |
 | --- | --- | --- |
 | **桌面端** | 推送 `desktop-v*` 标签 | `DocBoxTrans-<tag>.zip`（含 `DocBoxTrans.exe`、`DocBoxTransConfig.exe` 与图标），挂到该标签的 Release |
-| **Zotero 插件** | 手动运行 `Release Zotero Plugin` 工作流 | `.xpi` 挂到 `v<version>` Release，并刷新 `release` 更新清单 Release 中的 `update.json` |
+| **Zotero 插件** | 推送 `v*` 标签（须与包版本一致，如 `v0.3.2`） | `.xpi` 挂到 `v<version>` Release，并刷新 `release` 更新清单 Release 中的 `update.json` |
 
-> 插件发布前，先把 `DocBoxTrans-Zotero/package.json` 的 `version` 提升到目标版本并推送；工作流据此创建 / 更新对应 Release。
+> 插件发布前，先把 `DocBoxTrans-Zotero/package.json` 的 `version` 提升到目标版本并推送代码，再推送同名标签（`v<version>`）；工作流据此创建 / 更新对应 Release。
 
 ---
 
