@@ -87,7 +87,7 @@ namespace DocBoxTrans
         public string CnkiApi = "https://dict.cnki.net/fyzs-front-api/translate/literaltranslation";
         public int CnkiMaxChars = 500;
         // ---- 必应（免费）/ 腾讯交互（免费）/ 有道（需 key）----
-        public string BingApi = "https://api.cognitive.microsofttranslator.com/translate";
+        public string BingApi = "https://edge.microsoft.com/translate/translatetext";
         public string TencentApi = "https://transmart.qq.com/api/imt";
         public string YoudaoApi = "https://openapi.youdao.com/api";
         public string YoudaoAppKey = "";    // 有道智云「应用 ID」
@@ -122,7 +122,7 @@ google_api_list=https://clients5.google.com/translate_a/t
 cnki_token_url=https://dict.cnki.net/fyzs-front-api/getToken
 cnki_api=https://dict.cnki.net/fyzs-front-api/translate/literaltranslation
 cnki_max_chars=500
-bing_api=https://api.cognitive.microsofttranslator.com/translate
+bing_api=https://edge.microsoft.com/translate/translatetext
 tencent_api=https://transmart.qq.com/api/imt
 youdao_api=https://openapi.youdao.com/api
 youdao_appkey=

@@ -1,0 +1,83 @@
+name: Release
+
+# 一次推送 v* 标签 = 同时发布「桌面端 + Zotero 插件」，两个子项目的产物挂在同一个 Release 下。
+#
+# 约定：标签必须等于插件的版本（DocBoxTrans-Zotero/package.json 的 version），
+#       例如版本 0.3.3 → 标签 v0.3.3。
+# 原因：插件脚手架在 CI 中不会自增版本，而是用 package.json 的 version 拼出 Release 标签 v<version>，
+#       并且它要求该标签下的 Release 尚不存在（已存在会直接报错）。
+#       因此必须由「插件」任务先创建 Release，桌面端产物再追加到同一个 Release 上。
+#
+# 发布流程：先把 package.json 的 version 提到目标版本并推送代码，再推送同名标签 v<version>。
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # 1) 插件：构建并创建 Release（tag = v<version>），上传 .xpi，并刷新 release 标签下的 update.json
+  plugin:
+    name: Zotero plugin (.xpi)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: DocBoxTrans-Zotero
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: DocBoxTrans-Zotero/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & release
+        run: npm run release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 2) 桌面端：构建并打包（此处先不发布，等插件任务把 Release 建好）
+  desktop:
+    name: Desktop (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build (build.ps1)
+        shell: pwsh
+        run: ./DocBoxTrans/build.ps1
+
+      - name: Package
+        shell: pwsh
+        run: Compress-Archive -Path DocBoxTrans/DocBoxTrans.exe,DocBoxTrans/DocBoxTransConfig.exe,DocBoxTrans/DocBoxTrans.ico -DestinationPath "DocBoxTrans-${{ github.ref_name }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-zip
+          path: DocBoxTrans-${{ github.ref_name }}.zip
+          if-no-files-found: error
+
+  # 3) 把桌面端 zip 追加到插件已创建好的同一个 Release（只加附件，不改 Release 正文）
+  publish-desktop:
+    name: Attach desktop zip
+    needs: [plugin, desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-zip
+
+      - name: Upload desktop zip to the same release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release upload "${{ github.ref_name }}" DocBoxTrans-*.zip --clobber

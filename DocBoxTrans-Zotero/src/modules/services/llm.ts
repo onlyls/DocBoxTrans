@@ -1,5 +1,6 @@
 import { TranslateError, TranslateService } from "./base";
 import type { HistoryRecord } from "../../utils/history";
+import { getString } from "../../utils/locale";
 import { getPref } from "../../utils/prefs";
 import { HttpStatusError, httpJson, truncate } from "../../utils/http";
 
@@ -120,3 +121,62 @@ export const LlmService: TranslateService = {
   supportsContext: () => true,
   translate,
 };
+
+/**
+ * 「测试连接」用：按当前设置发一次最小翻译请求，验证接口、密钥与系统提示词是否真的可用。
+ * 不抛错，统一返回 { ok, message }，方便偏好面板直接展示。
+ */
+export async function probeConnection(): Promise<{ ok: boolean; message: string }> {
+  const apiKey = String(getPref("llm.apiKey") || "").trim();
+  const endpoint = String(getPref("llm.endpoint") || "").trim();
+  const model = String(getPref("llm.model") || "").trim();
+  const temperature = Number(getPref("llm.temperature")) || 0.2;
+  const systemPrompt = String(getPref("llm.systemPrompt") || "");
+
+  if (!apiKey || !endpoint) {
+    return { ok: false, message: getString("test-need-config") };
+  }
+
+  const started = Date.now();
+  try {
+    const res = await httpJson("POST", endpoint, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + apiKey,
+        Accept: "application/json",
+      },
+      body: buildBody(model, temperature, systemPrompt, "Hello", []),
+      timeout: 20000,
+    });
+    const err = extractErrorFromResponse(res);
+    if (err) {
+      return { ok: false, message: getString("test-fail", { args: { detail: err } }) };
+    }
+    const content = extractContent(res);
+    if (content == null) {
+      return {
+        ok: false,
+        message: getString("test-fail", {
+          args: { detail: truncate(JSON.stringify(res ?? ""), 200) },
+        }),
+      };
+    }
+    return {
+      ok: true,
+      message: getString("test-ok", {
+        args: { detail: `${content}（${Date.now() - started}ms）` },
+      }),
+    };
+  } catch (e) {
+    if (e instanceof HttpStatusError) {
+      const detail = extractErrorFromBody(e.body) ?? e.message;
+      return { ok: false, message: getString("test-fail", { args: { detail } }) };
+    }
+    return {
+      ok: false,
+      message: getString("test-fail", {
+        args: { detail: String((e as any)?.message ?? e) },
+      }),
+    };
+  }
+}

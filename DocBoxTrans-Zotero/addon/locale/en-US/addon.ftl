@@ -17,6 +17,11 @@ status-empty-selection = [Info] No text selected.
 status-unknown-service = [Error] Unknown service: 
 status-request-error = [Request error]
 
+test-running = Testing…
+test-ok = Connection OK: { $detail }
+test-fail = Test failed: { $detail }
+test-need-config = Fill in the required key / endpoint first
+
 history-search = Search source or translation
 history-allTags = All tags
 history-empty = No translation records yet

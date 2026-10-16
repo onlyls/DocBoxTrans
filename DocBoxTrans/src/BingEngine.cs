@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Net.Http;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,9 +9,22 @@ using System.Web.Script.Serialization;
 namespace DocBoxTrans
 {
     /// <summary>
-    /// 必应翻译引擎（免费）：直接调用微软在线翻译接口 api.cognitive.microsofttranslator.com/translate，
-    /// 用 X-MT-Signature 头（HMAC-SHA256）匿名鉴权，无需注册 key。国内通常需要代理。
-    /// 注：原先「先用 edge.microsoft.com/translate/auth 取临时令牌」的链路已被官方下线（返回 404），故不再使用。
+    /// 必应翻译引擎（免费）：调用微软 Edge 客户端使用的在线翻译接口
+    ///   POST https://edge.microsoft.com/translate/translatetext?to=&lt;目标语言&gt;&amp;isEnterpriseClient=false
+    /// 请求体为「字符串数组」（["待翻译文本"]），无需注册 key，也不需要 X-MT-Signature 匿名签名。
+    /// 该接口与请求格式参考自 zotero-pdf-translate 的必应服务（AGPL-3.0）：https://github.com/windingwind/zotero-pdf-translate
+    ///
+    /// 与旧端点 api.cognitive.microsofttranslator.com/translate（匿名签名）相比：
+    ///   - 旧端点限制「单次请求内所有待翻译文本合计 ≤1000 字符」，故短文本正常、长文本必被拒；
+    ///   - 本端点单次上限为 50000 字符（官方文档值；实测 50000 通过，100000 返回
+    ///     "Request exceeds the maximum allowed translation size."）。
+    ///     因此这里按块逐次请求、每块不超过 MaxChunk，既避开上限又尽量少发请求。
+    ///
+    /// 注意事项：
+    ///   - 必须携带浏览器 User-Agent，缺失会返回 400 "Client Browser Version not supported"；
+    ///     共享 HttpClient 已统一设置 Chrome UA，无需在请求上单独添加。
+    ///   - 不要传 from 参数：服务端会自动识别源语言；显式传 "auto" 会返回 400。
+    /// 国内通常需要代理（走 cfg.Proxy）。
     /// </summary>
     class BingEngine : ITranslateEngine
     {
@@ -22,9 +33,11 @@ namespace DocBoxTrans
         static HttpClient client;
         static string clientProxy;
 
-        const string DefaultApi = "https://api.cognitive.microsofttranslator.com/translate";
-        const int MaxChunk = 1000;      // 微软接口单元素 1000 字符上限
-        const string ApiVersion = "3.0";
+        const string DefaultApi = "https://edge.microsoft.com/translate/translatetext";
+        // 旧版内置端点：其匿名签名接口对单次请求有 1000 字符上限，长文本必然失败。
+        // 配置文件里仍写着它的（老版本生成的 config.ini）一律迁移到上面的新端点。
+        const string LegacyApi = "https://api.cognitive.microsofttranslator.com/translate";
+        const int MaxChunk = 10000; // 该端点官方单次上限 50000 字符，此处留足余量
 
         public string Id { get { return "bing"; } }
         public string DisplayName { get { return "必应"; } }
@@ -49,6 +62,15 @@ namespace DocBoxTrans
             }
         }
 
+        /// <summary>解析实际使用的接口地址：留空、或仍是旧端点时，回退到新端点。</summary>
+        static string ResolveEndpoint(string configured)
+        {
+            string v = (configured ?? "").Trim();
+            if (v.Length == 0) return DefaultApi;
+            if (string.Equals(v.TrimEnd('/'), LegacyApi, StringComparison.OrdinalIgnoreCase)) return DefaultApi;
+            return v;
+        }
+
         public async Task<TranslateResult> TranslateAsync(AppConfig cfg, string text, CancellationToken ct)
         {
             try
@@ -56,36 +78,31 @@ namespace DocBoxTrans
                 string to = TranslateSupport.MapTargetLang(cfg.TargetLang, "zh-Hans", "zh-Hant");
                 List<string> chunks = TranslateSupport.SplitChunks(text, MaxChunk);
 
-                // 一次请求携带多段（接口按数组下标返回，顺序一致）
-                StringBuilder body = new StringBuilder();
-                body.Append('[');
+                string baseUrl = ResolveEndpoint(cfg.BingApi);
+                // 不传 from：由服务端自动识别源语言（显式传 "auto" 会报 400）
+                string url = baseUrl + (baseUrl.IndexOf('?') >= 0 ? "&" : "?")
+                    + "to=" + Uri.EscapeDataString(to) + "&isEnterpriseClient=false";
+
+                StringBuilder sb = new StringBuilder();
                 for (int i = 0; i < chunks.Count; i++)
                 {
-                    if (i > 0) body.Append(',');
-                    body.Append("{\"Text\":").Append(TranslateSupport.JsonString(chunks[i])).Append('}');
+                    // 本接口的请求体是字符串数组，不是对象数组
+                    string body = "[" + TranslateSupport.JsonString(chunks[i]) + "]";
+
+                    HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Post, url);
+                    req.Content = new StringContent(body, Encoding.UTF8, "application/json");
+                    req.Headers.TryAddWithoutValidation("Accept", "application/json");
+
+                    string txt = await TranslateSupport.SendAsync(cfg, GetClient(cfg), req, ct).ConfigureAwait(false);
+                    string parsed = ParseBing(txt);
+                    if (parsed == null) return TranslateResult.Err("[必应翻译失败] 响应解析失败。\n" + TranslateSupport.Truncate(txt, 400));
+                    sb.Append(parsed);
                 }
-                body.Append(']');
-
-                string baseUrl = string.IsNullOrEmpty(cfg.BingApi) ? DefaultApi : cfg.BingApi;
-                string url = baseUrl + (baseUrl.IndexOf('?') >= 0 ? "&" : "?")
-                    + "api-version=" + ApiVersion + "&to=" + Uri.EscapeDataString(to);
-
-                HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Post, url);
-                req.Content = new StringContent(body.ToString(), Encoding.UTF8, "application/json");
-                // 签名对象是「不含协议头」的完整请求地址，必须与实际请求的 URL 完全一致
-                string signTarget = url.Substring(url.IndexOf("://", StringComparison.Ordinal) + 3);
-                req.Headers.TryAddWithoutValidation("X-MT-Signature", GetSignature(signTarget));
-                req.Headers.TryAddWithoutValidation("Accept", "application/json");
-
-                string txt = await TranslateSupport.SendAsync(cfg, GetClient(cfg), req, ct).ConfigureAwait(false);
-                string parsed = ParseBing(txt);
-                if (parsed == null) return TranslateResult.Err("[必应翻译失败] 响应解析失败。\n" + TranslateSupport.Truncate(txt, 400));
-                return TranslateResult.Ok(parsed);
+                return TranslateResult.Ok(sb.ToString().Trim());
             }
             catch (HttpStatusException se)
             {
-                return TranslateResult.Err("[必应翻译失败] HTTP " + se.StatusCode
-                     + (se.StatusCode == 403 ? "（国内直连可能被拒，请在 config.ini 里配置 proxy，例如 http://127.0.0.1:7890）" : ""));
+                return TranslateResult.Err("[必应翻译失败] HTTP " + se.StatusCode + StatusHint(se));
             }
             catch (Exception ex)
             {
@@ -93,8 +110,24 @@ namespace DocBoxTrans
             }
         }
 
+        /// <summary>按状态码 / 响应体给出排查提示。</summary>
+        static string StatusHint(HttpStatusException se)
+        {
+            string body = se.Body ?? "";
+            if (body.IndexOf("maximum allowed translation size", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "（单次文本超出接口上限，请缩短选区或分批翻译）";
+            if (body.IndexOf("Client Browser Version", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "（接口拒绝了本次请求，请检查代理设置）";
+            switch (se.StatusCode)
+            {
+                case 403: return "（国内直连可能被拒，请配置 proxy，例如 http://127.0.0.1:7890）";
+                case 429: return "（请求过于频繁，请稍后重试）";
+                default: return "";
+            }
+        }
+
         /// <summary>
-        /// 解析 [{"translations":[{"text":"...","to":"..."}]}, ...]，按顺序拼接。
+        /// 解析 [{"translations":[{"text":"..."}]}, ...]，按顺序拼接。
         /// </summary>
         static string ParseBing(string json)
         {
@@ -124,38 +157,5 @@ namespace DocBoxTrans
             }
             catch { return null; }
         }
-
-        /// <summary>
-        /// 生成 X-MT-Signature。算法来自微软 Edge 客户端的匿名鉴权方案：
-        /// HMAC-SHA256(key, lower("MSTranslatorAndroidApp" + urlencode(不含协议头的 URL) + 时间 + guid))，
-        /// 头值形如 "MSTranslatorAndroidApp::{签名}::{时间}::{guid}"。
-        /// 参考 https://github.com/d4n3436/GTranslate/blob/master/src/GTranslate/Translators/MicrosoftTranslator.cs
-        /// </summary>
-        /// <param name="url">不含协议头的请求地址（含查询串）。</param>
-        static string GetSignature(string url)
-        {
-            string guid = Guid.NewGuid().ToString("N");
-            string escapedUrl = Uri.EscapeDataString(url);
-            string dateTime = DateTime.UtcNow.ToString("ddd, dd MMM yyyy HH:mm:ss", CultureInfo.InvariantCulture) + "GMT";
-
-            byte[] bytes = Encoding.UTF8.GetBytes(("MSTranslatorAndroidApp" + escapedUrl + dateTime + guid).ToLowerInvariant());
-            using (HMACSHA256 hmac = new HMACSHA256(PrivateKey))
-            {
-                byte[] hash = hmac.ComputeHash(bytes);
-                return "MSTranslatorAndroidApp::" + Convert.ToBase64String(hash) + "::" + dateTime + "::" + guid;
-            }
-        }
-
-        static readonly byte[] PrivateKey = new byte[]
-        {
-            0xa2, 0x29, 0x3a, 0x3d, 0xd0, 0xdd, 0x32, 0x73,
-            0x97, 0x7a, 0x64, 0xdb, 0xc2, 0xf3, 0x27, 0xf5,
-            0xd7, 0xbf, 0x87, 0xd9, 0x45, 0x9d, 0xf0, 0x5a,
-            0x09, 0x66, 0xc6, 0x30, 0xc6, 0x6a, 0xaa, 0x84,
-            0x9a, 0x41, 0xaa, 0x94, 0x3a, 0xa8, 0xd5, 0x1a,
-            0x6e, 0x4d, 0xaa, 0xc9, 0xa3, 0x70, 0x12, 0x35,
-            0xc7, 0xeb, 0x12, 0xf6, 0xe8, 0x23, 0x07, 0x9e,
-            0x47, 0x10, 0x95, 0x91, 0x88, 0x55, 0xd8, 0x17
-        };
     }
 }

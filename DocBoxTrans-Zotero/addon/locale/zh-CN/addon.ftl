@@ -17,6 +17,11 @@ status-empty-selection = [提示] 未选中任何文本。
 status-unknown-service = [错误] 未知的翻译服务：
 status-request-error = [请求错误]
 
+test-running = 检测中…
+test-ok = 连接正常：{ $detail }
+test-fail = 检测失败：{ $detail }
+test-need-config = 请先填写必需的密钥 / 接口配置
+
 history-search = 搜索原文或译文
 history-allTags = 全部标签
 history-empty = 暂无翻译记录

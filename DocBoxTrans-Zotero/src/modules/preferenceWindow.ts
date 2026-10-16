@@ -2,6 +2,8 @@ import { config, homepage } from "../../package.json";
 import { getString } from "../utils/locale";
 import { getPref, setPref } from "../utils/prefs";
 import { services } from "./services";
+import { probeConnection as probeLlm } from "./services/llm";
+import { probeConnection as probeYoudao } from "./services/youdao";
 
 /** 注册 Zotero 7 偏好设置面板。 */
 export function registerPrefsWindow() {
@@ -21,6 +23,75 @@ export function registerPrefsScripts(win: Window) {
   buildServiceMenulist(win);
   bindSystemPrompt(win);
   bindYoudaoMode(win);
+  bindSecretToggles(win);
+  bindConnectionTests(win);
+}
+
+/** 密钥 / 应用 ID 等敏感字段：默认以密码框显示，勾选「显示」后才临时明文。 */
+function bindSecretToggles(win: Window) {
+  const pairs: Array<[string, string]> = [
+    ["llm-apiKey", "llm-apiKey-show"],
+    ["youdao-appKey", "youdao-appKey-show"],
+    ["youdao-secret", "youdao-secret-show"],
+  ];
+  for (const [inputId, toggleId] of pairs) {
+    const input = win.document.querySelector(
+      `#${config.addonRef}-${inputId}`,
+    ) as HTMLInputElement | null;
+    const toggle = win.document.querySelector(
+      `#${config.addonRef}-${toggleId}`,
+    ) as XUL.Checkbox | null;
+    if (!input || !toggle) continue;
+    const sync = () => {
+      input.type = toggle.checked ? "text" : "password";
+    };
+    sync();
+    toggle.addEventListener("command", sync);
+  }
+}
+
+/** 「测试连接」按钮：用当前设置发一次探测请求，把结果写到下方的说明文字里。 */
+function bindConnectionTests(win: Window) {
+  bindConnectionTest(win, "llm-test", "llm-testResult", probeLlm);
+  bindConnectionTest(win, "youdao-test", "youdao-testResult", probeYoudao);
+}
+
+function bindConnectionTest(
+  win: Window,
+  buttonId: string,
+  resultId: string,
+  probe: () => Promise<{ ok: boolean; message: string }>,
+) {
+  const button = win.document.querySelector(
+    `#${config.addonRef}-${buttonId}`,
+  ) as XUL.Button | null;
+  const result = win.document.querySelector(
+    `#${config.addonRef}-${resultId}`,
+  ) as XUL.Label | null;
+  if (!button || !result) return;
+
+  button.addEventListener("command", async () => {
+    button.disabled = true;
+    setTestResult(result, getString("test-running"), "");
+    try {
+      const r = await probe();
+      setTestResult(result, r.message, r.ok ? "#2e7d32" : "#d32f2f");
+    } catch (e) {
+      setTestResult(
+        result,
+        getString("test-fail", { args: { detail: String((e as any)?.message ?? e) } }),
+        "#d32f2f",
+      );
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+/** XUL label 用 value 承载文本；顺便用颜色区分通过 / 失败。 */
+function setTestResult(el: XUL.Label, text: string, color: string) {
+  el.value = text;
+  el.style.color = color;
 }
 
 /** 系统提示词是 XUL textarea，Zotero 默认不做 preference 绑定，这里手动读写。 */

@@ -2,6 +2,7 @@ import { TranslateError } from "./base";
 import type { TranslateService } from "./base";
 import type { HistoryRecord } from "../../utils/history";
 import { mapTargetLang, splitChunks } from "../../utils/config";
+import { getString } from "../../utils/locale";
 import { getPref } from "../../utils/prefs";
 import {
   HttpStatusError,
@@ -274,3 +275,37 @@ export const YoudaoService: TranslateService = {
   supportsContext: () => useLlm(),
   translate,
 };
+
+/**
+ * 「测试连接」用：按当前模式（auto 跟随上下文开关）发一次最小翻译请求，
+ * 验证应用 ID / 应用密钥是否有效、所需接口是否已开通。不抛错，返回 { ok, message }。
+ */
+export async function probeConnection(): Promise<{ ok: boolean; message: string }> {
+  if (!hasKey()) {
+    return { ok: false, message: getString("test-need-config") };
+  }
+
+  const to = mapTargetLang(
+    String(getPref("targetLanguage") || "zh-CN"),
+    "zh-CHS",
+    "zh-CHT",
+  );
+  const llm = useLlm();
+  try {
+    const out = llm
+      ? await translateLlmChunk("Hello world", to, null)
+      : await translateTextChunk("Hello world", to);
+    return {
+      ok: true,
+      message: getString("test-ok", {
+        args: { detail: `${out}（${llm ? "llm" : "text"}）` },
+      }),
+    };
+  } catch (e) {
+    const detail =
+      e instanceof HttpStatusError
+        ? "HTTP " + e.status
+        : String((e as any)?.message ?? e);
+    return { ok: false, message: getString("test-fail", { args: { detail } }) };
+  }
+}

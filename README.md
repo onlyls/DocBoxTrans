@@ -44,14 +44,37 @@
 
 ## 发布
 
-发布通过 GitHub Actions（[.github/workflows/](.github/workflows/)）完成：
+两个子项目**共用一次发布**：推送一个 `v*` 标签，GitHub Actions（[.github/workflows/release.yml](.github/workflows/release.yml)）会把桌面端与 Zotero 插件的产物发布到**同一个 Release**：
 
-| 目标 | 触发方式 | 产物 |
+| 任务 | 产物 | 说明 |
 | --- | --- | --- |
-| **桌面端** | 推送 `desktop-v*` 标签 | `DocBoxTrans-<tag>.zip`（含 `DocBoxTrans.exe`、`DocBoxTransConfig.exe` 与图标），挂到该标签的 Release |
-| **Zotero 插件** | 推送 `v*` 标签（须与包版本一致，如 `v0.3.2`） | `.xpi` 挂到 `v<version>` Release，并刷新 `release` 更新清单 Release 中的 `update.json` |
+| **Zotero 插件** | `doc-box-trans-for-zotero-<version>.xpi` | 挂到 `v<version>` Release，并刷新 `release` 标签下的 `update.json`（供 Zotero 自动更新） |
+| **桌面端** | `DocBoxTrans-<tag>.zip`（含 `DocBoxTrans.exe`、`DocBoxTransConfig.exe` 与图标） | 追加到同一个 `v<version>` Release |
 
-> 插件发布前，先把 `DocBoxTrans-Zotero/package.json` 的 `version` 提升到目标版本并推送代码，再推送同名标签（`v<version>`）；工作流据此创建 / 更新对应 Release。
+发布步骤：
+
+1. 把 `DocBoxTrans-Zotero/package.json` 的 `version` 提升到目标版本（例如 `0.3.3`），推送代码；
+2. 推送**同名**标签（`v0.3.3`）——标签必须与包版本一致，插件脚手架据此拼出 Release 标签。
+
+> 为什么必须由插件任务先创建 Release：脚手架在 CI 中不自增版本，而是用 `package.json` 的 `version` 生成 `v<version>` Release，且该 Release **已存在时会直接报错**；因此工作流让插件任务先创建 Release，桌面端任务再把 zip 追加到同一个 Release（`gh release upload`，只加附件、不改 Release 正文）。桌面端没有独立版本号，其发布版本即本次推送的标签。
+
+---
+
+## 致谢
+
+本项目在设计与实现过程中参考、借鉴了以下优秀开源项目，特此致谢：
+
+| 项目 | 作者 | 协议 | 参考内容 |
+| --- | --- | --- | --- |
+| [Zotero PDF Translate](https://github.com/windingwind/zotero-pdf-translate) | windingwind | AGPL-3.0 | Zotero 插件端的实现思路；必应翻译所采用的接口（`edge.microsoft.com/translate/translatetext`）与请求格式 |
+| [STranslate](https://github.com/ZGGSONG/STranslate) | zggsong | MIT | 结果浮窗的卡片视觉与排版（分区小标题、圆角胶囊分段控件、图标按钮） |
+| [Pot（派了个萌的翻译器）](https://github.com/pot-app/pot-desktop) | pot-app | GPL-3.0 | 划词翻译工具的产品形态与浮窗视觉参考 |
+
+---
+
+## 开发说明
+
+本项目使用 **Trae**（模型：**DeepSeek-V4.1-Flash**）开发。
 
 ---
 

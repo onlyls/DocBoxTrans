@@ -59,7 +59,7 @@ namespace DocBoxTrans
                 new Item("target_lang", "目标语言", "例 zh-CN（简体）/ zh-TW（繁体）/ en / ja", KStr),
                 new Item("google_api", "谷歌接口地址", "谷歌免费翻译接口", KStr),
                 new Item("google_api_list", "谷歌备用端点", "逗号分隔；主端点被限流(429)时自动轮换。留空=只用主端点", KStr),
-                new Item("bing_api", "必应翻译地址", "必应翻译接口（免费，匿名签名鉴权，国内通常需代理）", KStr),
+                new Item("bing_api", "必应翻译地址", "必应翻译接口（免费，无需 key；单次上限 50000 字符，国内通常需代理）", KStr),
                 new Item("tencent_api", "腾讯翻译地址", "腾讯交互翻译接口（免费，国内直连，无需 key）", KStr),
                 new Item("cnki_token_url", "知网取令牌地址", "知网取会话令牌的地址", KStr),
                 new Item("cnki_api", "知网翻译地址", "知网学术翻译接口", KStr),
