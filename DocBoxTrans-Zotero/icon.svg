@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!--
+    DocBoxTrans for Zotero —— 插件图标矢量母版
+    风格：Zotero 10 扁平风（红六边形 D + 蓝色 A 方块 + 浅灰「文」方块 + 双向翻译箭头）
+    D 取自插件名 DocBoxTrans 首字母
+    配色：红 #EF303A / 蓝 #3181F8 / 浅灰 #EDF1F6 / 深灰字 #4B5566
+    导出：favicon.png(48) 与 favicon@2x.png(96)
+    注意：「文」字使用系统字体（Microsoft YaHei UI），重建时请确保系统装有中文字体
+  -->
+  <g transform="translate(-14,0)">
+    <!-- 红六边形（Zotero 标识形，圆角） -->
+    <path d="M 233.7 56 L 316.9 104 Q 344.6 120 344.6 152 L 344.6 248 Q 344.6 280 316.9 296
+             L 233.7 344 Q 206 360 178.3 344 L 95.1 296 Q 67.4 280 67.4 248
+             L 67.4 152 Q 67.4 120 95.1 104 L 178.3 56 Q 206 40 233.7 56 Z" fill="#EF303A"/>
+
+    <!-- 白色 D（竖笔 + 右半圆碗，外轮廓 R=90，内抠 r=44，笔画 46） -->
+    <path d="M 126 110 L 196 110 A 90 90 0 0 1 196 290 L 126 290 Z
+             M 172 156 L 196 156 A 44 44 0 0 1 196 244 L 172 244 Z"
+          fill="#FFFFFF" fill-rule="evenodd" stroke="#FFFFFF" stroke-width="8" stroke-linejoin="round"/>
+
+    <!-- 翻译箭头：A → 文 -->
+    <path d="M 348 226 C 396 214 430 240 436 280" fill="none" stroke="#3181F8"
+          stroke-width="17" stroke-linecap="round"/>
+    <path d="M 439.8 305.7 L 419.6 278.4 L 451.2 273.6 Z" fill="#3181F8"/>
+
+    <!-- 翻译箭头：文 → A -->
+    <path d="M 308 440 C 308 466 288 474 264 468" fill="none" stroke="#3181F8"
+          stroke-width="17" stroke-linecap="round"/>
+
+    <!-- 文 方块 -->
+    <rect x="340" y="306" width="138" height="138" rx="42" fill="#EDF1F6" stroke="#DCE4EE" stroke-width="4"/>
+    <text x="423" y="376" font-family="Microsoft YaHei UI, Microsoft YaHei, Noto Sans SC, sans-serif"
+          font-weight="700" font-size="86" fill="#4B5566" text-anchor="middle" dominant-baseline="central">文</text>
+
+    <!-- A 方块 -->
+    <rect x="216" y="296" width="152" height="152" rx="48" fill="#3181F8"/>
+    <path d="M 250 420 L 292 334 L 334 420" fill="none" stroke="#FFFFFF" stroke-width="26"
+          stroke-linejoin="round" stroke-linecap="butt"/>
+    <path d="M 266 392 L 318 392" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="butt"/>
+  </g>
+</svg>

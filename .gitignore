@@ -1,0 +1,12 @@
+# ---- 第三方参考项目（不属于本项目，不发布）----
+pot-desktop-master/
+STranslate-main/
+zotero-pdf-translate-main/
+
+# ---- TraeCode 工作区配置 ----
+.trae/
+
+# ---- 系统文件 ----
+.DS_Store
+Thumbs.db
+desktop.ini

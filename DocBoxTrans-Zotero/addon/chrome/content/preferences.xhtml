@@ -1,0 +1,248 @@
+<linkset>
+  <html:link rel="localization" href="__addonRef__-preferences.ftl" />
+</linkset>
+<vbox
+  id="zotero-prefpane-__addonRef__"
+  onload="Zotero.__addonInstance__.hooks.onPrefsLoad(event)"
+>
+  <groupbox>
+    <label><html:h2 data-l10n-id="pref-general"></html:h2></label>
+    <checkbox
+      id="__addonRef__-enableAuto"
+      data-l10n-id="pref-enableAuto"
+      native="true"
+      preference="__prefsPrefix__.enableAuto"
+    />
+    <checkbox
+      id="__addonRef__-enablePopup"
+      data-l10n-id="pref-enablePopup"
+      native="true"
+      preference="__prefsPrefix__.enablePopup"
+    />
+    <checkbox
+      id="__addonRef__-showServiceSelector"
+      data-l10n-id="pref-showServiceSelector"
+      native="true"
+      preference="__prefsPrefix__.showServiceSelector"
+    />
+    <hbox align="center">
+      <label data-l10n-id="pref-fontSize"></label>
+      <html:input
+        id="__addonRef__-fontSize"
+        type="text"
+        preference="__prefsPrefix__.fontSize"
+      ></html:input>
+    </hbox>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2 data-l10n-id="pref-service"></html:h2></label>
+    <hbox align="center">
+      <label data-l10n-id="pref-service-source"></label>
+      <!-- 由 preferenceWindow.ts 动态填充 -->
+      <box id="__addonRef__-serviceSource-placeholder"></box>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-service-targetLanguage"></label>
+      <html:input
+        id="__addonRef__-targetLanguage"
+        type="text"
+        preference="__prefsPrefix__.targetLanguage"
+        style="min-width: 120px"
+      ></html:input>
+    </hbox>
+    <label data-l10n-id="pref-service-hint"></label>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2 data-l10n-id="pref-llm"></html:h2></label>
+    <hbox align="center">
+      <label data-l10n-id="pref-llm-endpoint"></label>
+      <html:input
+        id="__addonRef__-llm-endpoint"
+        type="text"
+        preference="__prefsPrefix__.llm.endpoint"
+        style="min-width: 320px"
+      ></html:input>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-llm-model"></label>
+      <html:input
+        id="__addonRef__-llm-model"
+        type="text"
+        preference="__prefsPrefix__.llm.model"
+      ></html:input>
+      <label data-l10n-id="pref-llm-temperature"></label>
+      <html:input
+        id="__addonRef__-llm-temperature"
+        type="text"
+        preference="__prefsPrefix__.llm.temperature"
+        style="max-width: 60px"
+      ></html:input>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-llm-apiKey"></label>
+      <html:input
+        id="__addonRef__-llm-apiKey"
+        type="text"
+        preference="__prefsPrefix__.llm.apiKey"
+        style="min-width: 280px"
+      ></html:input>
+    </hbox>
+    <label data-l10n-id="pref-llm-systemPrompt"></label>
+    <textarea
+      id="__addonRef__-llm-systemPrompt"
+      rows="4"
+    ></textarea>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2 data-l10n-id="pref-youdao"></html:h2></label>
+    <hbox align="center">
+      <label data-l10n-id="pref-youdao-appKey"></label>
+      <html:input
+        id="__addonRef__-youdao-appKey"
+        type="text"
+        preference="__prefsPrefix__.youdao.appKey"
+        style="min-width: 220px"
+      ></html:input>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-youdao-secret"></label>
+      <html:input
+        id="__addonRef__-youdao-secret"
+        type="text"
+        preference="__prefsPrefix__.youdao.secret"
+        style="min-width: 220px"
+      ></html:input>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-youdao-mode"></label>
+      <menulist
+        id="__addonRef__-youdao-mode"
+        native="true"
+      >
+        <menupopup>
+          <menuitem data-l10n-id="pref-youdao-mode-auto" value="auto" />
+          <menuitem data-l10n-id="pref-youdao-mode-text" value="text" />
+          <menuitem data-l10n-id="pref-youdao-mode-llm" value="llm" />
+        </menupopup>
+      </menulist>
+    </hbox>
+    <label data-l10n-id="pref-youdao-hint"></label>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2 data-l10n-id="pref-engines"></html:h2></label>
+    <hbox align="center">
+      <label data-l10n-id="pref-google-endpoint"></label>
+      <html:input
+        type="text"
+        preference="__prefsPrefix__.google.endpoint"
+        style="min-width: 300px"
+      ></html:input>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-google-proxy"></label>
+      <html:input
+        type="text"
+        preference="__prefsPrefix__.google.proxy"
+        style="min-width: 300px"
+      ></html:input>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-bing-endpoint"></label>
+      <html:input
+        type="text"
+        preference="__prefsPrefix__.bing.endpoint"
+        style="min-width: 300px"
+      ></html:input>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-tencent-endpoint"></label>
+      <html:input
+        type="text"
+        preference="__prefsPrefix__.tencent.endpoint"
+        style="min-width: 300px"
+      ></html:input>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-cnki-maxChars"></label>
+      <html:input
+        type="text"
+        preference="__prefsPrefix__.cnki.maxChars"
+        style="max-width: 80px"
+      ></html:input>
+    </hbox>
+    <label data-l10n-id="pref-engines-hint"></label>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2 data-l10n-id="pref-context"></html:h2></label>
+    <checkbox
+      id="__addonRef__-contextEnable"
+      data-l10n-id="pref-context-enable"
+      native="true"
+      preference="__prefsPrefix__.contextEnable"
+    />
+    <hbox align="center">
+      <label data-l10n-id="pref-context-maxItems"></label>
+      <html:input
+        type="text"
+        preference="__prefsPrefix__.contextMaxItems"
+        style="max-width: 80px"
+      ></html:input>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-context-maxChars"></label>
+      <html:input
+        type="text"
+        preference="__prefsPrefix__.contextMaxChars"
+        style="max-width: 100px"
+      ></html:input>
+    </hbox>
+    <label data-l10n-id="pref-context-hint"></label>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2 data-l10n-id="pref-combine"></html:h2></label>
+    <hbox align="center">
+      <label data-l10n-id="pref-combine-addShortcut"></label>
+      <html:input
+        id="__addonRef__-combine-addShortcut"
+        type="text"
+        preference="__prefsPrefix__.combineAddShortcut"
+        style="min-width: 140px"
+      ></html:input>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-combine-translateShortcut"></label>
+      <html:input
+        id="__addonRef__-combine-translateShortcut"
+        type="text"
+        preference="__prefsPrefix__.combineTranslateShortcut"
+        style="min-width: 140px"
+      ></html:input>
+    </hbox>
+    <label data-l10n-id="pref-combine-hint"></label>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2 data-l10n-id="pref-history"></html:h2></label>
+    <checkbox
+      id="__addonRef__-reuseTranslation"
+      data-l10n-id="pref-reuseTranslation"
+      native="true"
+      preference="__prefsPrefix__.reuseTranslation"
+    />
+    <label data-l10n-id="pref-history-hint"></label>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2 data-l10n-id="pref-about"></html:h2></label>
+    <label
+      data-l10n-id="pref-about-version"
+      data-l10n-args='{"name":"__addonName__","version":"__buildVersion__","time":"__buildTime__"}'
+    ></label>
+  </groupbox>
+</vbox>

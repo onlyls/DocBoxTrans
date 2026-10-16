@@ -1,0 +1,17 @@
+# ---- 构建产物 ----
+*.exe
+*.pdb
+bin/
+obj/
+
+# ---- 运行期文件（含密钥与个人数据，切勿提交）----
+config.ini*
+*.bak
+log.txt
+watcher.log
+history.jsonl
+
+# ---- IDE / 编辑器 ----
+.vs/
+*.user
+*.suo

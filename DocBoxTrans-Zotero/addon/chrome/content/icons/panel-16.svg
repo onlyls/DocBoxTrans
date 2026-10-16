@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <!--
+    DocBoxTrans for Zotero —— 小尺寸面板图标（16×16）
+    用于 Zotero 条目面板分区头部（header.icon 要求 16*16）与划词翻译记录行内图标。
+    16px 下 A/文 徽标与箭头无法辨认，故仅保留红六边形 + 加粗白 D（插件名 DocBoxTrans 首字母），并减小圆角、加粗笔画以保证清晰度。
+    注意：Zotero 以 CSS background 载入该图标且未设置 background-size，
+    因此必须提供 16*16 固有尺寸，否则会被裁切。
+  -->
+  <path d="M 8.866 1 L 13.629 3.75 Q 14.495 4.25 14.495 5.25 L 14.495 10.75 Q 14.495 11.75 13.629 12.25
+           L 8.866 15 Q 8 15.5 7.134 15 L 2.371 12.25 Q 1.505 11.75 1.505 10.75 L 1.505 5.25
+           Q 1.505 4.25 2.371 3.75 L 7.134 1 Q 8 0.5 8.866 1 Z" fill="#EF303A"/>
+  <path d="M 3.8 3.3 L 7.5 3.3 A 4.7 4.7 0 0 1 7.5 12.7 L 3.8 12.7 Z
+           M 6.2 5.7 L 7.5 5.7 A 2.3 2.3 0 0 1 7.5 10.3 L 6.2 10.3 Z"
+        fill="#FFFFFF" fill-rule="evenodd" stroke="#FFFFFF" stroke-width="0.3" stroke-linejoin="round"/>
+</svg>
