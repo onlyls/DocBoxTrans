@@ -1,6 +1,6 @@
 {
   "name": "docboxtrans-zotero",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "在 Zotero 阅读器中划词翻译，移植 DocBoxTrans 的翻译引擎与「上下文增强翻译」。",
   "config": {
     "addonName": "DocBoxTrans for Zotero",

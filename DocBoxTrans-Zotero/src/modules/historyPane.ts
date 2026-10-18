@@ -18,9 +18,12 @@ import { popupState, rerunWith, translateCombined, refreshCombineViews, primaryT
 /** 已挂载的面板 body（用于直接重渲染，不依赖 Zotero 的 refresh()）。 */
 const paneBodies = new Set<HTMLElement>();
 
-/** 当前筛选状态（各面板共享）。 */
-let filterText = "";
-let filterTag = "";
+/**
+ * 筛选状态按面板隔离（挂在各自 root 的 dataset 上），不再全局共享：
+ * 条目面板与阅读器面板（乃至不同条目/不同文件）是相互独立的记录范围，
+ * 搜索关键词只应作用于当前面板自身，否则会出现「面板 A 搜索后进入面板 B，
+ * 结果被 A 的关键词过滤而搜索框却是空的」这种隐藏过滤状态。
+ */
 /** 面板排序方式（各面板共享）：time=按翻译时间（最新在前，默认）；source=按原文前后顺序。 */
 type SortMode = "time" | "source";
 let sortMode: SortMode = "time";
@@ -39,11 +42,17 @@ interface PaneScope {
 /** 把面板当前的过滤范围记到 body 上（供渲染/清空时按范围过滤）。 */
 function setBodyScope(body: HTMLElement, item?: Zotero.Item, tabType?: string) {
   const scope = computeScope(item, tabType);
+  const nextId = scope.id != null ? String(scope.id) : "";
+  // 面板切换到了不同的条目/文件：清空本面板的搜索条件，避免旧关键词过滤新范围
+  const scopeChanged =
+    (body.dataset.scopeKind ?? "") !== scope.kind ||
+    (body.dataset.scopeId ?? "") !== nextId;
   body.dataset.scopeKind = scope.kind;
-  body.dataset.scopeId = scope.id != null ? String(scope.id) : "";
+  body.dataset.scopeId = nextId;
   body.dataset.itemId = item && item.id != null ? String(item.id) : "";
   // 分区类型：reader=阅读器侧栏（面板需撑满整块空白），library=条目面板（按内容堆叠）
   body.dataset.tabType = tabType ?? "";
+  if (scopeChanged) resetPanelFilter(body);
 }
 
 /** 面板所属分区类型（reader=阅读器侧栏，library=条目面板）。 */
@@ -57,6 +66,48 @@ function readScope(el: HTMLElement): PaneScope {
   const v = el.dataset.scopeId;
   const n = v ? parseInt(v, 10) : NaN;
   return { kind, id: Number.isFinite(n) ? n : undefined };
+}
+
+/** 本面板的筛选关键词/标签（按 root 隔离，不跨面板共享）。 */
+interface PaneFilter {
+  text: string;
+  tag: string;
+}
+
+/** 读取本面板的筛选条件（未设置时为空，即不筛选）。 */
+function readFilter(root: HTMLElement): PaneFilter {
+  return {
+    text: root.dataset.filterText ?? "",
+    tag: root.dataset.filterTag ?? "",
+  };
+}
+
+/** 更新本面板的筛选条件到 root 上。 */
+function writeFilter(root: HTMLElement, patch: Partial<PaneFilter>) {
+  if (patch.text != null) root.dataset.filterText = patch.text;
+  if (patch.tag != null) root.dataset.filterTag = patch.tag;
+}
+
+/**
+ * 清空本面板的筛选条件，并同步清空搜索框/标签下拉。
+ * 面板切换到不同的条目/文件（范围变化）时调用，保证新范围默认展示全部记录、
+ * 且控件显示与筛选结果始终一致（不会出现「有结果被过滤但搜索框为空」）。
+ */
+function resetPanelFilter(body: HTMLElement) {
+  const root = body.querySelector(
+    `.${config.addonRef}-history-root`,
+  ) as HTMLElement | null;
+  if (!root) return;
+  root.dataset.filterText = "";
+  root.dataset.filterTag = "";
+  const search = root.querySelector(
+    `.${config.addonRef}-history-search`,
+  ) as HTMLInputElement | null;
+  if (search) search.value = "";
+  const tagSel = root.querySelector(
+    `.${config.addonRef}-history-tags`,
+  ) as HTMLSelectElement | null;
+  if (tagSel) tagSel.value = "";
 }
 
 /**
@@ -388,8 +439,10 @@ function buildChrome(root: HTMLElement, doc: Document) {
   search.className = `${config.addonRef}-history-search`;
   search.placeholder = getString("history-search");
   search.style.cssText = "flex:1;min-width:0;box-sizing:border-box;";
+  // 初值取本面板自身的筛选条件，保证搜索框显示与筛选结果一致
+  search.value = root.dataset.filterText ?? "";
   search.addEventListener("input", () => {
-    filterText = search.value;
+    writeFilter(root, { text: search.value });
     refreshList(root, doc);
   });
 
@@ -397,10 +450,12 @@ function buildChrome(root: HTMLElement, doc: Document) {
   tagSel.className = `${config.addonRef}-history-tags`;
   tagSel.style.cssText = "max-width:110px;";
   tagSel.addEventListener("change", () => {
-    filterTag = tagSel.value;
+    writeFilter(root, { tag: tagSel.value });
     refreshList(root, doc);
   });
   fillTagOptions(tagSel, doc);
+  // 初值取本面板自身的标签筛选条件（选项填充后回填，保证与筛选结果一致）
+  tagSel.value = root.dataset.filterTag ?? "";
 
   bar.appendChild(search);
   bar.appendChild(tagSel);
@@ -922,13 +977,15 @@ function refreshList(root: HTMLElement, doc: Document) {
   list.textContent = "";
   const scrollTop = list.scrollTop;
   const scope = readScope(root);
+  // 筛选条件取自本面板自身（不跨面板共享），保证「搜索框显示的内容」就是「列表被过滤的条件」
+  const filter = readFilter(root);
   syncSortControl(root);
   const view = sortRecords(
     (
       scope.kind === "file"
         ? historyStore.snapshotForFile(scope.id)
         : historyStore.snapshotForItem(scope.id)
-    ).filter(matchesFilter),
+    ).filter((rec) => matchesFilter(rec, filter)),
     sortMode,
     scope,
   );
@@ -1252,15 +1309,18 @@ function fillTagOptions(sel: HTMLSelectElement, doc: Document) {
   sel.value = current;
 }
 
-function matchesFilter(rec: import("../utils/history").HistoryRecord): boolean {
-  if (filterTag) {
+function matchesFilter(
+  rec: import("../utils/history").HistoryRecord,
+  filter: PaneFilter,
+): boolean {
+  if (filter.tag) {
     const hit = (rec.tags ?? []).some(
-      (t) => t.toLowerCase() === filterTag.toLowerCase(),
+      (t) => t.toLowerCase() === filter.tag.toLowerCase(),
     );
     if (!hit) return false;
   }
-  if (filterText) {
-    const q = filterText.toLowerCase();
+  if (filter.text) {
+    const q = filter.text.toLowerCase();
     if (
       !rec.sourceText.toLowerCase().includes(q) &&
       !rec.translatedText.toLowerCase().includes(q)
