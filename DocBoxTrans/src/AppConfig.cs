@@ -33,7 +33,7 @@ namespace DocBoxTrans
         public string Model = "deepseek-chat";
         public double Temperature = 0.2;
         public int TimeoutSeconds = 30;
-        public string SystemPrompt = "你是专业的翻译引擎。把用户提供的文本翻译成简体中文，只输出译文本身，不要任何解释、标注或原文。保留原有的换行和标点结构。";
+        public string SystemPrompt = "你是专业的翻译引擎。把用户提供的文本翻译成简体中文，只输出译文本身，不要任何解释、标注或原文。保留原有的换行和标点结构。文中参考文献引用序号一律转换为 Unicode 上标字符输出：方括号 [ ] 转为 ⁽ ⁾，数字 0-9 转为 ⁰¹²³⁴⁵⁶⁷⁸⁹，逗号转为 ʼ，连字符转为 ⁻，例如 [1] 输出为 ⁽¹⁾、[2,3] 输出为 ⁽²ʼ³⁾、[4-6] 输出为 ⁽⁴⁻⁶⁾。";
         public int MaxChars = 4000;
 
         public int PopupWidth = 460;
@@ -137,7 +137,7 @@ model=deepseek-chat
 temperature=0.2
 timeout_seconds=30
 max_chars=4000
-system_prompt=你是专业的翻译引擎。把用户提供的文本翻译成简体中文，只输出译文本身，不要任何解释、标注或原文。保留原有的换行和标点结构。
+system_prompt=你是专业的翻译引擎。把用户提供的文本翻译成简体中文，只输出译文本身，不要任何解释、标注或原文。保留原有的换行和标点结构。文中参考文献引用序号一律转换为 Unicode 上标字符输出：方括号 [ ] 转为 ⁽ ⁾，数字 0-9 转为 ⁰¹²³⁴⁵⁶⁷⁸⁹，逗号转为 ʼ，连字符转为 ⁻，例如 [1] 输出为 ⁽¹⁾、[2,3] 输出为 ⁽²ʼ³⁾、[4-6] 输出为 ⁽⁴⁻⁶⁾。
 
 hotkey=Alt+Q
 hotkey_clipboard=Alt+Shift+Q
