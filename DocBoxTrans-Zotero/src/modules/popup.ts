@@ -3,6 +3,7 @@ import { getString } from "../utils/locale";
 import { getPref, setPref } from "../utils/prefs";
 import { getLastTask, createTask, runTranslationTask } from "../utils/task";
 import type { RecordPosition } from "../utils/history";
+import * as historyStore from "../utils/historyStore";
 import * as combineStore from "../utils/combineStore";
 import type { CombineItem } from "../utils/combineStore";
 import { pillStyle, applyDisabledStyle, PILL_PADDING_COMPACT } from "../utils/uiStyle";
@@ -264,12 +265,15 @@ export function buildReaderPopup(
                       const checked = (ev.target as HTMLInputElement).checked;
                       combineStore.setMode(checked);
                       if (checked) {
-                        // 开启拼接时，顺带把当前选区也收录进来
-                        combineStore.add(
-                          popupState.itemId,
-                          popupState.selectedText,
-                          popupState.position,
-                        );
+                        // 开启拼接时，顺带把当前选区也收录进来；但该段若已在未开启拼接时
+                        // 翻译过（已有译文），则不再收录，避免把上次翻译的段落并入拼合区
+                        if (!currentSelectionTranslated()) {
+                          combineStore.add(
+                            popupState.itemId,
+                            popupState.selectedText,
+                            popupState.position,
+                          );
+                        }
                       } else {
                         // 退出拼接：恢复显示上次翻译结果
                         popupState.resultClearedFor = undefined;
@@ -460,6 +464,25 @@ export function isResultClearedFor(itemId: number | undefined): boolean {
     itemId != null &&
     popupState.resultClearedFor === itemId
   );
+}
+
+/**
+ * 当前选区是否已经翻译过（未开启拼接时产生过译文）。
+ * 开启拼接时据此跳过自动收录，避免把上次普通翻译的段落并入拼合区。
+ */
+export function currentSelectionTranslated(): boolean {
+  const text = (popupState.selectedText ?? "").trim();
+  if (!text) return false;
+  const task = getLastTask();
+  if (
+    task &&
+    (task.raw ?? "").trim() === text &&
+    (task.itemId ?? -1) === (popupState.itemId ?? -1) &&
+    (task.status === "success" || task.status === "processing")
+  ) {
+    return true;
+  }
+  return historyStore.hasTranslatedSource(text, popupState.itemId);
 }
 
 /** 拼合区片段数 > 0 时，主「翻译」按钮翻译拼合内容；否则翻译当前选区（与原有行为一致）。 */

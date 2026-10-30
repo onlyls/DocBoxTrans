@@ -8,7 +8,7 @@ import { getPref, setPref } from "../utils/prefs";
 import { getLastTask } from "../utils/task";
 import * as combineStore from "../utils/combineStore";
 import { pillCss, applyDisabledStyle, PILL_PADDING_COMPACT, type PillVariant } from "../utils/uiStyle";
-import { popupState, rerunWith, translateCombined, refreshCombineViews, primaryTranslateLabel } from "./popup";
+import { popupState, rerunWith, translateCombined, refreshCombineViews, primaryTranslateLabel, currentSelectionTranslated } from "./popup";
 
 /**
  * 「翻译记录」侧栏面板：通过 Zotero.ItemPaneManager.registerSection 注册，
@@ -722,8 +722,11 @@ function buildCombineArea(
         onChange: (v) => {
           combineStore.setMode(v);
           if (v && popupState.itemId === itemId) {
-            // 开启拼接时，若当前选区正属于本面板的文档则同时收录
-            combineStore.add(itemId, popupState.selectedText, popupState.position);
+            // 开启拼接时，若当前选区正属于本面板的文档则同时收录；但该段若已在未开启
+            // 拼接时翻译过（已有译文），则不再收录，避免把上次翻译的段落并入拼合区
+            if (!currentSelectionTranslated()) {
+              combineStore.add(itemId, popupState.selectedText, popupState.position);
+            }
           } else if (!v) {
             // 退出拼接：恢复显示上次翻译结果
             popupState.resultClearedFor = undefined;

@@ -324,6 +324,22 @@ export function findBySource(
   return undefined;
 }
 
+/** 指定附件下是否已有某段原文的译文（不限引擎与目标语言；供开启拼接时跳过已翻译的段落）。 */
+export function hasTranslatedSource(
+  sourceText: string,
+  itemId?: number,
+): boolean {
+  const text = sourceText ?? "";
+  if (!text) return false;
+  const key = itemId ?? -1;
+  for (let i = records.length - 1; i >= 0; i--) {
+    const r = records[i];
+    if ((r.itemId ?? -1) !== key) continue;
+    if (r.sourceText === text) return true;
+  }
+  return false;
+}
+
 /** 删除指定条目的全部记录（供「清空本条目」），并落盘。 */
 export function clearForItem(itemId?: number): number {
   if (typeof itemId !== "number") return 0;
