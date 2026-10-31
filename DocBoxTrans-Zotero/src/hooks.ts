@@ -148,9 +148,11 @@ function onReaderPopupShow(
 
   // 拼接模式：把新选区自动加入拼合区，并暂停「选中文本后自动翻译」（翻译由「翻译」按钮/快捷键触发）
   if (combineStore.getMode()) {
-    // 清空上次翻译结果，避免被误认为本次选区的译文
-    popupState.resultClearedFor = popupState.itemId;
-    addSelectionToCombine();
+    // 仅在确实收录了新片段时清空上次翻译结果：重复选中同一段落时保留原结果，
+    // 避免把已有译文误清空
+    if (addSelectionToCombine()) {
+      popupState.resultClearedFor = popupState.itemId;
+    }
     updateReaderPopup();
     refreshHistoryPanes();
     return;

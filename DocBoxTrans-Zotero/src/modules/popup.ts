@@ -3,7 +3,6 @@ import { getString } from "../utils/locale";
 import { getPref, setPref } from "../utils/prefs";
 import { getLastTask, createTask, runTranslationTask } from "../utils/task";
 import type { RecordPosition } from "../utils/history";
-import * as historyStore from "../utils/historyStore";
 import * as combineStore from "../utils/combineStore";
 import type { CombineItem } from "../utils/combineStore";
 import { pillStyle, applyDisabledStyle, PILL_PADDING_COMPACT } from "../utils/uiStyle";
@@ -264,17 +263,9 @@ export function buildReaderPopup(
                     listener: (ev: Event) => {
                       const checked = (ev.target as HTMLInputElement).checked;
                       combineStore.setMode(checked);
-                      if (checked) {
-                        // 开启拼接时，顺带把当前选区也收录进来；但该段若已在未开启拼接时
-                        // 翻译过（已有译文），则不再收录，避免把上次翻译的段落并入拼合区
-                        if (!currentSelectionTranslated()) {
-                          combineStore.add(
-                            popupState.itemId,
-                            popupState.selectedText,
-                            popupState.position,
-                          );
-                        }
-                      } else {
+                      // 开启拼接只切换模式，不收录任何已有选区（含上次残留的选区）：
+                      // 片段由拼接模式下的新选区自动加入，或由用户主动点「追加」
+                      if (!checked) {
                         // 退出拼接：恢复显示上次翻译结果
                         popupState.resultClearedFor = undefined;
                       }
@@ -466,25 +457,6 @@ export function isResultClearedFor(itemId: number | undefined): boolean {
   );
 }
 
-/**
- * 当前选区是否已经翻译过（未开启拼接时产生过译文）。
- * 开启拼接时据此跳过自动收录，避免把上次普通翻译的段落并入拼合区。
- */
-export function currentSelectionTranslated(): boolean {
-  const text = (popupState.selectedText ?? "").trim();
-  if (!text) return false;
-  const task = getLastTask();
-  if (
-    task &&
-    (task.raw ?? "").trim() === text &&
-    (task.itemId ?? -1) === (popupState.itemId ?? -1) &&
-    (task.status === "success" || task.status === "processing")
-  ) {
-    return true;
-  }
-  return historyStore.hasTranslatedSource(text, popupState.itemId);
-}
-
 /** 拼合区片段数 > 0 时，主「翻译」按钮翻译拼合内容；否则翻译当前选区（与原有行为一致）。 */
 export function translatePrimary() {
   const itemId = popupState.itemId;
@@ -518,19 +490,29 @@ export function addSelectionToCombine(): boolean {
 
 /**
  * 一并翻译拼合区：把已收录的片段拼接成一段后创建一个任务；
- * 翻译成功后清空拼合区（失败则保留，便于调整后重试）。
+ * 翻译成功后只清空「本次已送入翻译」的片段（失败则保留，便于调整后重试）。
+ * 只清理快照片段，避免翻译进行期间新收录的片段被一并清掉。
  */
 export async function translateCombined(itemId: number | undefined): Promise<boolean> {
+  const items = combineStore.list(itemId);
   const text = combineStore.join(itemId);
   if (!text) return false;
   // 发起新翻译：结果区重新显示这次拼接译文
   popupState.resultClearedFor = undefined;
-  const task = createTask(text, itemId, undefined, combineStore.firstPosition(itemId));
+  const task = createTask(
+    text,
+    itemId,
+    undefined,
+    combineStore.firstPosition(itemId),
+    true,
+  );
   if (!task) return false;
   const ok = await runTranslationTask(task, {
     noDisplay: !Boolean(getPref("enablePopup")),
   });
-  if (ok) combineStore.clear(itemId);
+  if (ok) {
+    for (const it of items) combineStore.remove(itemId, it.id);
+  }
   refreshCombineViews();
   return ok;
 }

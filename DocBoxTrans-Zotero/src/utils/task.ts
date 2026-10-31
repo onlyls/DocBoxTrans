@@ -23,6 +23,8 @@ export interface TranslateTask {
   position?: RecordPosition;
   /** 结果已写入历史后的记录 id（供侧栏「当前翻译」定位其标签）；复用命中时同样写入。 */
   recordId?: string;
+  /** 是否由拼合区拼接而成；此时上下文需排除已包含在原文中的片段，避免重复。 */
+  combined?: boolean;
   langfrom: string;
   langto: string;
   status: "waiting" | "processing" | "success" | "fail";
@@ -36,6 +38,7 @@ export function createTask(
   itemId?: number,
   service?: string,
   position?: RecordPosition,
+  combined?: boolean,
 ): TranslateTask | undefined {
   const trimmed = (raw ?? "").trim();
   if (!trimmed) return undefined;
@@ -47,6 +50,7 @@ export function createTask(
     service: service || String(getPref("translateSource") || "llm"),
     itemId,
     position: position ?? undefined,
+    combined: combined || undefined,
     langfrom: "auto",
     langto: String(getPref("targetLanguage") || "zh-CN"),
     status: "waiting",
@@ -109,6 +113,13 @@ export async function runTranslationTask(
       getPrefInt("contextMaxItems", 4),
       getPrefInt("contextMaxChars", 1500),
     );
+    // 拼合翻译的原文已包含这些片段：将其历史译文从上下文中剔除，
+    // 避免同一段内容既在原文出现又作为上文参考，导致译文重复
+    if (task.combined) {
+      context = context.filter(
+        (r) => !(r.sourceText && task.raw.includes(r.sourceText)),
+      );
+    }
   }
   const seq = translationContext.nextSeq();
   const gen = translationContext.getGeneration();
