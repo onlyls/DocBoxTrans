@@ -20,6 +20,35 @@ export interface HttpOptions {
   responseType?: "text" | "json" | "arraybuffer" | "blob";
   /** 允许「非 2xx 也返回」，由调用方自行判断 */
   allowNon2xx?: boolean;
+  signal?: AbortSignal;
+  onTextChunk?: (chunk: string) => void;
+}
+
+function responseBody(xhr?: XMLHttpRequest): string {
+  if (!xhr) return "";
+  try {
+    return xhr.responseType === "json"
+      ? JSON.stringify(xhr.response ?? "") : xhr.responseText || "";
+  } catch {
+    return "";
+  }
+}
+
+/** 可取消的重试等待，取消后不再启动下一次请求。 */
+export function requestDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new Error("Request cancelled")); return; }
+    const abort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+      reject(new Error("Request cancelled"));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", abort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", abort, { once: true });
+  });
 }
 
 /**
@@ -32,6 +61,25 @@ export async function httpRequest(
   options: HttpOptions = {},
 ): Promise<XMLHttpRequest> {
   const responseType = options.responseType ?? "text";
+  const signal = options.signal;
+  let cancel: (() => void) | undefined;
+  let observed: XMLHttpRequest | undefined;
+  let progressError: unknown;
+  let consumed = 0;
+  const progress = () => {
+    if (!observed || signal?.aborted || progressError || observed.status < 200 || observed.status >= 300) return;
+    try {
+      const text = observed.responseText || "";
+      if (text.length > consumed) options.onTextChunk?.(text.slice(consumed));
+      consumed = text.length;
+    } catch (e) {
+      progressError = e;
+      cancel?.();
+    }
+  };
+  const abort = () => cancel?.();
+  if (signal?.aborted) throw new Error("Request cancelled");
+  signal?.addEventListener("abort", abort, { once: true });
   let xhr: XMLHttpRequest;
   try {
     xhr = await Zotero.HTTP.request(method, url, {
@@ -39,21 +87,36 @@ export async function httpRequest(
       body: options.body,
       responseType,
       timeout: options.timeout ?? 30000,
+      successCodes: options.allowNon2xx ? false : undefined,
+      errorDelayMax: 0,
+      requestObserver: options.onTextChunk ? (request: XMLHttpRequest) => {
+        observed = request;
+        request.addEventListener("progress", progress);
+      } : undefined,
+      cancellerReceiver: (canceller: () => void) => {
+        cancel = canceller;
+        if (signal?.aborted) cancel();
+      },
     });
+    observed = xhr;
+    if (options.onTextChunk) progress(); // 无 progress 事件或最后一段尚未触发时补读。
+    if (progressError) throw progressError;
   } catch (e: any) {
+    if (progressError) throw progressError;
     // Zotero.HTTP.request 在非成功码时抛错，尽量还原状态与响应体
+    const failedXhr = e?.xmlhttp ?? e?.xhr;
     const status =
       (typeof e?.status === "number" && e.status) ||
-      (typeof e?.xhr?.status === "number" && e.xhr.status) ||
+      (typeof failedXhr?.status === "number" && failedXhr.status) ||
       0;
-    const body = e?.xhr?.responseText ?? e?.responseText ?? String(e?.message ?? e);
-    if (options.allowNon2xx) {
-      return e?.xhr as XMLHttpRequest;
-    }
+    const body = responseBody(failedXhr) || e?.responseText || String(e?.message ?? e);
     throw new HttpStatusError(status, body);
+  } finally {
+    signal?.removeEventListener("abort", abort);
+    observed?.removeEventListener?.("progress", progress);
   }
   if (!options.allowNon2xx && (xhr.status < 200 || xhr.status >= 300)) {
-    throw new HttpStatusError(xhr.status, (xhr.responseText as string) || "");
+    throw new HttpStatusError(xhr.status, responseBody(xhr));
   }
   return xhr;
 }

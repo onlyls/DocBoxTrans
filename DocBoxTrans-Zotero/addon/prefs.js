@@ -6,6 +6,8 @@ pref("__prefsPrefix__.fontSize", "12");
 pref("__prefsPrefix__.showServiceSelector", true);
 
 pref("__prefsPrefix__.reuseTranslation", true);
+pref("__prefsPrefix__.preprocessText", true);
+pref("__prefsPrefix__.llm.stream", true);
 
 pref("__prefsPrefix__.contextEnable", false);
 pref("__prefsPrefix__.contextMaxItems", 4);
@@ -20,7 +22,7 @@ pref("__prefsPrefix__.llm.model", "deepseek-chat");
 pref("__prefsPrefix__.llm.temperature", "0.2");
 pref(
   "__prefsPrefix__.llm.systemPrompt",
-  "你是专业的翻译引擎。把用户提供的文本翻译成简体中文，只输出译文本身，不要任何解释、标注或原文。保留原有的换行和标点结构。",
+  "你是专业的翻译引擎。把用户提供的文本翻译成{targetLanguage}，只输出译文本身，不要任何解释、标注或原文。保留原有的换行和标点结构。",
 );
 
 pref("__prefsPrefix__.youdao.appKey", "");

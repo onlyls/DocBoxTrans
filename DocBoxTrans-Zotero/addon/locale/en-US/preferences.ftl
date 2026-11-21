@@ -9,7 +9,7 @@ service-cnki = CNKI
 
 popup-translate = Translate
 popup-context = Context
-popup-context-title = Enable context-enhanced translation (use nearby previously translated segments of this document as reference)
+popup-context-title = Use recent translations from this session for the same file, engine and target language; surrounding paragraphs are not read automatically
 popup-empty = Select text in the reader first.
 
 status-translating = Translating…
@@ -99,3 +99,8 @@ pref-history-hint =
     .value = Records are persisted. View, search and tag them in "Translation Records" in the item pane or reader side nav.
 pref-about-version =
     .value = { $name } version { $version } (built at { $time })
+
+pref-preprocessText =
+    .label = Clean PDF line breaks and hyphenation (preserve paragraphs, lists and sentence boundaries)
+pref-llm-stream =
+    .label = Show LLM translation progressively (disable if unsupported by the service)

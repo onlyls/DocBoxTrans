@@ -20,6 +20,7 @@ async function translateChunk(
   endpoint: string,
   chunk: string,
   to: string,
+  signal?: AbortSignal,
 ): Promise<string | null> {
   const body = JSON.stringify({
     header: { fn: "auto_translation_block", client_key: ClientKey },
@@ -37,6 +38,7 @@ async function translateChunk(
       "user-agent": UserAgent,
     },
     body,
+    signal,
   });
 
   if (res && typeof res.auto_translation === "string") {
@@ -55,19 +57,19 @@ async function translateChunk(
 const translate: TranslateService["translate"] = async function (data) {
   const endpoint =
     String(getPref("tencent.endpoint") || "").trim() || DefaultApi;
-  const to = mapTargetLang(String(getPref("targetLanguage") || "zh-CN"), "zh", "zh-TW");
+  const to = mapTargetLang(data.langto, "zh", "zh-TW");
   const chunks = splitChunks(data.raw, MaxChunk);
 
   try {
     const parts: string[] = [];
     for (const chunk of chunks) {
-      const part = await translateChunk(endpoint, chunk, to);
+      const part = await translateChunk(endpoint, chunk, to, data.signal);
       if (part == null) {
         throw new TranslateError("[腾讯翻译失败] 响应解析失败。");
       }
       parts.push(part);
     }
-    data.result = parts.join("").trim();
+    return { text: parts.join("").trim() };
   } catch (e) {
     if (e instanceof HttpStatusError) {
       throw new TranslateError("[腾讯翻译失败] HTTP " + e.status);

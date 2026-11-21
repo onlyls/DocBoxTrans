@@ -5,22 +5,21 @@ import { getPref } from "./utils/prefs";
 import { registerPrefsWindow, registerPrefsScripts } from "./modules/preferenceWindow";
 import { setDefaultPrefs } from "./modules/defaultPrefs";
 import { registerReaderInitializer } from "./modules/reader";
-import { registerHistoryPane, refreshHistoryPanes } from "./modules/historyPane";
+import { registerHistoryPane, refreshHistoryPanes, refreshHistoryCurrent, unregisterHistoryPane } from "./modules/historyPane";
 import * as historyStore from "./utils/historyStore";
 import * as combineStore from "./utils/combineStore";
 import {
   installGoogleProxyFilter,
   uninstallGoogleProxyFilter,
 } from "./utils/http";
-import {
-  addSelectionToCombine,
-  buildReaderPopup,
-  createNewTaskFromSelection,
-  popupState,
-  translateCombined,
-  updateReaderPopup,
-} from "./modules/popup";
-import { runTranslationTask } from "./utils/task";
+import { buildReaderPopup, updateReaderPopup } from "./modules/popup";
+import { addSelectionToCombine, createNewTaskFromSelection, translateCombined } from "./modules/translationActions";
+import { subscribeTranslationUpdates } from "./utils/translationEvents";
+
+import { runTranslationTask, stopTranslationTasks } from "./utils/task";
+import { clearReaderStates, getActiveReaderState, getReaderState } from "./modules/readerState";
+
+let unsubscribeTranslationUpdates: (() => void) | undefined;
 
 async function onStartup() {
   await Promise.all([
@@ -30,6 +29,20 @@ async function onStartup() {
   ]);
 
   initLocale();
+  unsubscribeTranslationUpdates?.();
+  const unsubscribePopup = subscribeTranslationUpdates(({ displayPopup, progressOnly }) => {
+    if (displayPopup) updateReaderPopup(undefined, progressOnly);
+  });
+  const unsubscribePanes = subscribeTranslationUpdates(({ progressOnly }) => {
+    if (progressOnly) refreshHistoryCurrent(); else refreshHistoryPanes();
+  });
+  unsubscribeTranslationUpdates = () => { unsubscribePopup(); unsubscribePanes(); };
+  historyStore.setStorageStateListener(refreshHistoryPanes);
+  try {
+    registerHistoryShutdown();
+  } catch (e) {
+    Zotero.logError(e instanceof Error ? e : new Error(String(e)));
+  }
   setDefaultPrefs();
 
   // 逐步注册：任一步失败都不影响其它功能，并把原因写入 Zotero 调试输出（帮助 → 调试输出）
@@ -67,6 +80,34 @@ async function onStartup() {
   await Promise.all(Zotero.getMainWindows().map((win) => onMainWindowLoad(win)));
 }
 
+// APP_SHUTDOWN 不调用插件卸载钩子，使用异步屏障等待最后一批历史落盘。
+interface HistoryShutdownClient {
+  addBlocker(name: string, blocker: () => Promise<void>): void;
+  removeBlocker(blocker: () => Promise<void>): void;
+}
+let shutdownClient: HistoryShutdownClient | undefined;
+let shutdownBlocker: (() => Promise<void>) | undefined;
+
+function registerHistoryShutdown() {
+  // 使用 IOUtils 自己的屏障，确保此时仍接受新的磁盘写入。
+  shutdownClient = IOUtils.profileBeforeChange as HistoryShutdownClient;
+  shutdownBlocker = async () => {
+    stopTranslationTasks();
+    try {
+      await historyStore.flush();
+    } catch (e) {
+      Zotero.logError(e instanceof Error ? e : new Error(String(e)));
+    }
+  };
+  shutdownClient.addBlocker("DocBoxTrans: save translation history", shutdownBlocker);
+}
+
+function unregisterHistoryShutdown() {
+  if (shutdownClient && shutdownBlocker) shutdownClient.removeBlocker(shutdownBlocker);
+  shutdownClient = undefined;
+  shutdownBlocker = undefined;
+}
+
 /** 拼接翻译快捷键：把当前选区加入拼合区 / 一并翻译拼合区。留空表示不启用。 */
 function registerCombineShortcuts() {
   ztoolkit.Keyboard.register((ev, data) => {
@@ -75,15 +116,17 @@ function registerCombineShortcuts() {
     const addKey = String(getPref("combineAddShortcut") || "").trim();
     const trKey = String(getPref("combineTranslateShortcut") || "").trim();
     if (!addKey && !trKey) return;
+    const state = getActiveReaderState(ev.view ?? (ev.target as Node)?.ownerDocument?.defaultView);
+    if (!state) return;
     const keyboard = new KeyModifier(ev);
     if (addKey && keyboard.equals(addKey)) {
       ev.preventDefault();
       ev.stopPropagation();
-      addSelectionToCombine();
+      addSelectionToCombine(state);
     } else if (trKey && keyboard.equals(trKey)) {
       ev.preventDefault();
       ev.stopPropagation();
-      void translateCombined(popupState.itemId);
+      void translateCombined(state.itemId, state);
     }
   });
 }
@@ -118,7 +161,29 @@ function onMainWindowUnload(win: Window) {
     ?.remove();
 }
 
-function onShutdown() {
+function onShutdown(): Promise<void> {
+  // 快速禁用/启用时，共享同一次关闭操作，启动端会等待其落盘结束。
+  return addon.data.shutdownPromise ??= shutdownAddon();
+}
+
+async function shutdownAddon() {
+  addon.data.alive = false;
+  unsubscribeTranslationUpdates?.();
+  unsubscribeTranslationUpdates = undefined;
+  try {
+    unregisterHistoryPane();
+  } catch (e) {
+    Zotero.logError(e instanceof Error ? e : new Error(String(e)));
+  }
+  stopTranslationTasks();
+  try {
+    await historyStore.flush();
+  } catch (e) {
+    Zotero.logError(e instanceof Error ? e : new Error(String(e)));
+  }
+  unregisterHistoryShutdown();
+  historyStore.setStorageStateListener(undefined);
+  clearReaderStates();
   try {
     uninstallGoogleProxyFilter();
   } catch (e) {
@@ -126,7 +191,6 @@ function onShutdown() {
   }
   ztoolkit.unregisterAll();
   Zotero.getMainWindows().forEach((win) => onMainWindowUnload(win));
-  addon.data.alive = false;
   delete (Zotero as any)[config.addonInstance];
 }
 
@@ -139,9 +203,10 @@ function onPrefsLoad(event: Event) {
 function onReaderPopupShow(
   event: _ZoteroTypes.Reader.EventParams<"renderTextSelectionPopup">,
 ) {
+  const state = getReaderState(event.reader);
   buildReaderPopup(event);
 
-  if (!popupState.selectedText) {
+  if (!state.selectedText) {
     updateReaderPopup();
     return;
   }
@@ -150,8 +215,8 @@ function onReaderPopupShow(
   if (combineStore.getMode()) {
     // 仅在确实收录了新片段时清空上次翻译结果：重复选中同一段落时保留原结果，
     // 避免把已有译文误清空
-    if (addSelectionToCombine()) {
-      popupState.resultClearedFor = popupState.itemId;
+    if (addSelectionToCombine(state)) {
+      state.resultCleared = true;
     }
     updateReaderPopup();
     refreshHistoryPanes();
@@ -159,13 +224,13 @@ function onReaderPopupShow(
   }
 
   // 非拼接模式：本次选区会产生新结果，取消「已清空」状态
-  popupState.resultClearedFor = undefined;
-  const task = createNewTaskFromSelection();
+  state.resultCleared = false;
+  const task = createNewTaskFromSelection(state);
   updateReaderPopup();
   // 侧栏「当前翻译」区需即时反映新选区（未翻译时先显示待翻译状态）
   refreshHistoryPanes();
-  if (task && Boolean(getPref("enableAuto")) && !popupState.autoTranslated) {
-    popupState.autoTranslated = true;
+  if (task && Boolean(getPref("enableAuto")) && !state.autoTranslated) {
+    state.autoTranslated = true;
     // 阅读器弹窗被关闭时不把结果显示到弹窗；结果统一出现在「翻译记录」侧栏
     runTranslationTask(task, { noDisplay: !Boolean(getPref("enablePopup")) });
   }

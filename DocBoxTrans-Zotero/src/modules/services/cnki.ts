@@ -16,11 +16,12 @@ const TokenTtlMs = 300 * 1000;
 
 let tokenCache: { token: string; t: number } | null = null;
 
-async function getToken(): Promise<string> {
+async function getToken(signal?: AbortSignal): Promise<string> {
   const now = Date.now();
   if (tokenCache && now - tokenCache.t < TokenTtlMs) return tokenCache.token;
   const url = String(getPref("cnki.tokenUrl") || "").trim() || DefaultTokenUrl;
   const res = await httpJson("GET", url, {
+    signal,
     headers: {
       Accept: "application/json",
       referer: "https://dict.cnki.net/index",
@@ -59,10 +60,10 @@ function extractCnkiResult(res: any): string | null {
 }
 
 const translate: TranslateService["translate"] = async function (data) {
-  const token = await getToken();
   const api = String(getPref("cnki.api") || "").trim() || DefaultApi;
   const max = Math.max(60, getPrefInt("cnki.maxChars", 500));
   const chunks = splitChunks(data.raw, max);
+  const token = await getToken(data.signal);
 
   try {
     const parts: string[] = [];
@@ -76,12 +77,13 @@ const translate: TranslateService["translate"] = async function (data) {
           Token: token,
         },
         body: JSON.stringify({ translateType: null, words }),
+        signal: data.signal,
       });
       const result = extractCnkiResult(res);
       if (result == null) throw new TranslateError("[知网翻译失败] 响应解析失败。");
       parts.push(result);
     }
-    data.result = parts.join("\n").trim();
+    return { text: parts.join("\n").trim() };
   } catch (e) {
     if (e instanceof HttpStatusError) {
       throw new TranslateError("[知网翻译失败] HTTP " + e.status);

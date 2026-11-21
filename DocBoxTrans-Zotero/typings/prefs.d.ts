@@ -14,6 +14,8 @@ declare namespace _ZoteroTypes {
       "fontSize": string;
       "showServiceSelector": boolean;
       "reuseTranslation": boolean;
+      "preprocessText": boolean;
+      "llm.stream": boolean;
       "contextEnable": boolean;
       "contextMaxItems": number;
       "contextMaxChars": number;

@@ -5,12 +5,29 @@ import type { HistoryRecord, RecordPosition } from "./history";
  * 内存中维护按时间正序的记录列表（唯一数据源），磁盘为每行一个 JSON 对象的文本文件。
  * 落盘异步合并进行，不阻塞 UI；单行解析失败只跳过该行。
  *
- * 与 DocBoxTrans 的差异：同一原文的去重按「原文 + 所属文献(itemId)」进行，
- * 避免同一句话在不同论文里被互相顶掉。
+ * 按附件、原文、引擎、目标语言保留译文；同段原文的所有版本共享标签。
  */
 let records: HistoryRecord[] = [];
 let loaded = false;
+let loadPromise: Promise<void> | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let savePromise: Promise<void> | null = null;
+let revision = 0;
+let savedRevision = 0;
+let storageError = false;
+// 读取失败期间临时创建的记录，合并旧文件后仍能由当前任务的旧 id 找到。
+const idAliases = new Map<string, string>();
+let onStorageStateChange: (() => void) | undefined;
+
+function setStorageError(value: boolean): void {
+  if (storageError === value) return;
+  storageError = value;
+  onStorageStateChange?.();
+}
+
+export function setStorageStateListener(listener?: () => void): void {
+  onStorageStateChange = listener;
+}
 
 /** 用分隔符拼接路径：Zotero.File 底层走 PathUtils/nsIFile，Windows 下必须用原生反斜杠，混用正斜杠会 NS_ERROR_FILE_UNRECOGNIZED_PATH。 */
 function joinNative(dir: string, name: string): string {
@@ -93,12 +110,58 @@ function deriveParentItemId(itemId?: number): number | undefined {
 }
 
 function sourceKey(rec: HistoryRecord): string {
-  return `${rec.itemId ?? -1}\u0000${rec.sourceText}`;
+  return JSON.stringify([
+    rec.itemId ?? -1,
+    rec.sourceText,
+    rec.provider.toLowerCase(),
+    rec.targetLanguage.toLowerCase(),
+  ]);
 }
 
-/** 同一原文+文献只保留最后一次翻译结果（从最新往旧扫描）。 */
+function paragraphKey(rec: HistoryRecord): string {
+  return JSON.stringify([rec.itemId ?? null, rec.sourceText]);
+}
+
+function mergedTags(list: readonly HistoryRecord[]): string[] {
+  const tags = new Map<string, string>();
+  for (const rec of list) for (const raw of rec.tags) {
+    const tag = raw.trim();
+    if (tag && !tags.has(tag.toLowerCase())) tags.set(tag.toLowerCase(), tag);
+  }
+  return [...tags.values()];
+}
+
+function relatedRecords(rec: HistoryRecord): HistoryRecord[] {
+  const key = paragraphKey(rec);
+  return records.filter(record => paragraphKey(record) === key);
+}
+
+function setSharedTags(rec: HistoryRecord, tags: string[]): void {
+  for (const record of relatedRecords(rec)) record.tags = tags;
+}
+
+/** 合并旧文件中按引擎隔离的标签，采用并集保留已有标注。 */
+function shareLoadedTags(): boolean {
+  const groups = new Map<string, HistoryRecord[]>();
+  for (const rec of records) {
+    const key = paragraphKey(rec);
+    const group = groups.get(key) ?? [];
+    group.push(rec); groups.set(key, group);
+  }
+  let changed = false;
+  for (const group of groups.values()) {
+    const tags = mergedTags(group);
+    for (const rec of group) {
+      if (JSON.stringify(rec.tags) !== JSON.stringify(tags)) changed = true;
+      rec.tags = tags;
+    }
+  }
+  return changed;
+}
+
+/** 同一附件、原文、引擎、语言保留最新结果，合并已有标签。 */
 function dedupeBySource(list: HistoryRecord[]): HistoryRecord[] {
-  const seen = new Set<string>();
+  const seen = new Map<string, HistoryRecord>();
   const out: HistoryRecord[] = [];
   for (let i = list.length - 1; i >= 0; i--) {
     const r = list[i];
@@ -107,8 +170,15 @@ function dedupeBySource(list: HistoryRecord[]): HistoryRecord[] {
       continue;
     }
     const key = sourceKey(r);
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const latest = seen.get(key);
+    if (latest) {
+      latest.tags = [...new Set([...r.tags, ...latest.tags])];
+      if (latest.id !== r.id) idAliases.set(latest.id, r.id);
+      latest.id = r.id;
+      latest.position ??= r.position;
+      continue;
+    }
+    seen.set(key, r);
     out.unshift(r);
   }
   return out;
@@ -117,51 +187,101 @@ function dedupeBySource(list: HistoryRecord[]): HistoryRecord[] {
 /** 启动时读入既有记录（只做一次）。 */
 export async function ensureLoaded(): Promise<void> {
   if (loaded) return;
-  loaded = true;
-  const path = historyPath();
-  if (!path) return;
-  let text = "";
+  if (loadPromise) return loadPromise;
+  loadPromise = loadHistory();
   try {
-    text = (await Zotero.File.getContentsAsync(path)) as string;
-  } catch (e) {
-    // 首次运行文件不存在属正常情况；其它错误打到调试输出便于排查
-    Zotero.debug(`[DocBoxTrans] 读取历史文件失败: ${String(e)}`);
-    text = "";
+    await loadPromise;
+  } finally {
+    loadPromise = null;
   }
-  const list: HistoryRecord[] = [];
-  for (const line of (text || "").split("\n")) {
-    const t = line.replace(/^\uFEFF/, "").trim();
-    if (!t) continue;
-    try {
-      list.push(normalize(JSON.parse(t)));
-    } catch {
-      // 单行损坏只跳过该行
-    }
-  }
-  records = dedupeBySource(list);
 }
 
-async function saveNow(): Promise<void> {
+async function loadHistory(): Promise<void> {
   const path = historyPath();
-  if (!path) return;
-  const text = records.map((r) => JSON.stringify(r)).join("\n");
+  if (!path) throw new Error("History path is unavailable");
   try {
-    await Zotero.File.putContentsAsync(path, text);
+    // 只有明确不存在的文件才作为首次运行；读取失败时禁止覆盖原文件。
+    const text = (await IOUtils.exists(path)) ? await IOUtils.readUTF8(path) : "";
+    const list: HistoryRecord[] = [];
+    for (const line of text.split("\n")) {
+      const t = line.replace(/^\uFEFF/, "").trim();
+      if (!t) continue;
+      try {
+        list.push(normalize(JSON.parse(t)));
+      } catch {
+        Zotero.debug("[DocBoxTrans] 跳过损坏的历史记录；下次写入前会备份原文件");
+      }
+    }
+    // 读取失败期间的新译文暂存于内存，重试成功后合并，不能被磁盘快照顶掉。
+    records = dedupeBySource([...list, ...records]);
+    const tagsChanged = shareLoadedTags();
+    loaded = true;
+    if (tagsChanged) scheduleSave();
+    setStorageError(false);
   } catch (e) {
-    // 落盘失败不阻塞翻译，但记录到调试输出
-    Zotero.debug(`[DocBoxTrans] 写入历史文件失败: ${String(e)}`);
+    setStorageError(true);
+    throw e;
+  }
+}
+
+/** 等待所有待保存变更落盘；失败保留脏状态，供后续修改或关闭时重试。 */
+export async function flush(): Promise<void> {
+  if (saveTimer != null) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  if (savePromise) return savePromise;
+  if (savedRevision === revision) return;
+  savePromise = savePending();
+  try {
+    await savePromise;
+  } finally {
+    savePromise = null;
+  }
+}
+
+async function savePending(): Promise<void> {
+  try {
+    await ensureLoaded();
+    const path = historyPath();
+    if (!path) throw new Error("History path is unavailable");
+    // 单个写入循环串行排空；写入期间的新变更会在下一轮保存。
+    while (savedRevision < revision) {
+      const version = revision;
+      const text = records.map((r) => JSON.stringify(r)).join("\n");
+      await IOUtils.writeUTF8(path, text, {
+        tmpPath: `${path}.tmp`,
+        backupFile: `${path}.bak`,
+        flush: true,
+      });
+      savedRevision = version;
+    }
+    setStorageError(false);
+  } catch (e) {
+    setStorageError(true);
+    throw e;
   }
 }
 
 function scheduleSave(): void {
+  revision++;
   if (saveTimer != null) return;
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    void saveNow();
+    void flush().catch((e) => Zotero.logError(e));
   }, 300);
 }
 
+export function hasStorageError(): boolean {
+  return storageError;
+}
+
 function find(id: string): HistoryRecord | undefined {
+  const visited = new Set<string>();
+  while (idAliases.has(id) && !visited.has(id)) {
+    visited.add(id);
+    id = idAliases.get(id)!;
+  }
   return records.find((r) => r.id === id);
 }
 
@@ -188,9 +308,17 @@ export function add(
     tags: [],
   };
 
-  // 同一原文+文献只保留最后一次结果
+  // 同版本重译保留 id、标签和已有位置；其它引擎/语言保留各自的译文。
   if (rec.sourceText) {
     const key = sourceKey(rec);
+    const previous = records.find((r) => sourceKey(r) === key);
+    const related = relatedRecords(rec);
+    if (previous) {
+      rec.id = previous.id;
+      rec.position ??= previous.position;
+    }
+    rec.tags = mergedTags(related);
+    related.forEach(record => { record.tags = rec.tags; });
     for (let i = records.length - 1; i >= 0; i--) {
       if (sourceKey(records[i]) === key) records.splice(i, 1);
     }
@@ -203,7 +331,8 @@ export function add(
 /** 按 id 删除一条记录。 */
 export function remove(id: string): boolean {
   if (!id) return false;
-  const idx = records.findIndex((r) => r.id === id);
+  const record = find(id);
+  const idx = record ? records.indexOf(record) : -1;
   if (idx < 0) return false;
   records.splice(idx, 1);
   scheduleSave();
@@ -222,8 +351,9 @@ export function addTag(id: string, tag: string): boolean {
   if (!id || !t) return false;
   const r = find(id);
   if (!r) return false;
-  if (r.tags.some((x) => x.toLowerCase() === t.toLowerCase())) return false;
-  r.tags.push(t);
+  const tags = mergedTags(relatedRecords(r));
+  if (tags.some((x) => x.toLowerCase() === t.toLowerCase())) return false;
+  setSharedTags(r, [...tags, t]);
   scheduleSave();
   return true;
 }
@@ -233,17 +363,18 @@ export function removeTag(id: string, tag: string): boolean {
   if (!id || !t) return false;
   const r = find(id);
   if (!r) return false;
-  const before = r.tags.length;
-  r.tags = r.tags.filter((x) => x.toLowerCase() !== t.toLowerCase());
-  if (r.tags.length === before) return false;
+  const tags = mergedTags(relatedRecords(r));
+  const remaining = tags.filter(x => x.toLowerCase() !== t.toLowerCase());
+  if (remaining.length === tags.length) return false;
+  setSharedTags(r, remaining);
   scheduleSave();
   return true;
 }
 
 export function clearTags(id: string): boolean {
   const r = find(id);
-  if (!r || r.tags.length === 0) return false;
-  r.tags = [];
+  if (!r || !relatedRecords(r).some(record => record.tags.length)) return false;
+  setSharedTags(r, []);
   scheduleSave();
   return true;
 }

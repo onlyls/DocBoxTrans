@@ -7,6 +7,7 @@ class Addon {
   public data: {
     config: typeof config;
     alive: boolean;
+    shutdownPromise?: Promise<void>;
     env: "development" | "production";
     ztoolkit: ZToolkit;
     locale: { current?: any };

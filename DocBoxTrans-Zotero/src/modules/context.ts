@@ -50,8 +50,13 @@ class TranslationContextStore {
     if (!rec) return;
     if (gen !== this.generation) return;
 
-    // 同一原文只保留最新一次（重译后旧译文不再作为上下文）
-    this.removeBySource(rec.sourceText, rec.itemId);
+    // 同一版本按发起顺序保留最新一次；不同窗口的响应也可能乱序返回。
+    const sameVersion = (entry: Entry) => entry.rec.itemId === rec.itemId &&
+      entry.rec.sourceText === rec.sourceText &&
+      equalsIgnoreCase(entry.rec.provider, rec.provider) &&
+      equalsIgnoreCase(entry.rec.targetLanguage, rec.targetLanguage);
+    if (this.entries.some((entry) => sameVersion(entry) && entry.seq > seq)) return;
+    this.entries = this.entries.filter((entry) => !sameVersion(entry));
 
     let i = this.entries.length;
     while (i > 0 && this.entries[i - 1].seq > seq) i--; // 按发起顺序插入，避免乱序
@@ -64,7 +69,8 @@ class TranslationContextStore {
   /**
    * 构建本次请求使用的上下文快照（返回「旧 → 新」的副本）。
    * 筛选与当前 provider、目标语言、所属文献一致的记录；从最新往旧累计，
-   * 条数达 maxItems 或再加入会超过 maxChars 即停止；若最新一条单独就超限则返回空（按普通翻译处理）。
+   * 在计算预算前排除本次原文等不应参考的记录；超长记录跳过，保留完整的原文/译文配对。
+   * 条数与原文+译文字符总数均不超过上限，最终按翻译发起顺序排列。
    */
   snapshot(
     itemId: number | undefined,
@@ -72,11 +78,14 @@ class TranslationContextStore {
     targetLanguage: string,
     maxItems: number,
     maxChars: number,
+    exclude?: (rec: Readonly<HistoryRecord>) => boolean,
   ): HistoryRecord[] {
     const result: HistoryRecord[] = [];
     if (this.entries.length === 0) return result;
-    if (maxItems <= 0) maxItems = 1;
-    if (maxChars <= 0) maxChars = 800;
+    if (!Number.isFinite(maxItems) || maxItems <= 0) maxItems = 4;
+    if (!Number.isFinite(maxChars) || maxChars <= 0) maxChars = 1500;
+    maxItems = Math.max(1, Math.floor(maxItems));
+    maxChars = Math.floor(maxChars);
 
     const target = targetLanguage ?? "";
     const prov = provider ?? "";
@@ -90,15 +99,17 @@ class TranslationContextStore {
       if ((r.itemId ?? -1) !== key) continue;
       if (!equalsIgnoreCase(r.provider, prov)) continue;
       if (!equalsIgnoreCase(r.targetLanguage, target)) continue;
+      if (!r.sourceText?.trim() || !r.translatedText?.trim()) continue;
+      if (exclude?.(r)) continue;
 
       const len = strLen(r.sourceText) + strLen(r.translatedText);
-      if (used + len > maxChars) break; // 再加会超限 → 停止
+      if (used + len > maxChars) continue;
       result.push(r);
       taken++;
       used += len;
     }
 
-    result.reverse(); // 旧 → 新，便于按阅读顺序构造消息
+    result.reverse(); // 旧 → 新，按翻译发起顺序构造消息
     return result;
   }
 

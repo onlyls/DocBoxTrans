@@ -77,7 +77,7 @@ function statusHint(status: number, body: string): string {
 
 const translate: TranslateService["translate"] = async function (data) {
   const to = mapTargetLang(
-    String(getPref("targetLanguage") || "zh-CN"),
+    data.langto,
     "zh-Hans",
     "zh-Hant",
   );
@@ -103,6 +103,7 @@ const translate: TranslateService["translate"] = async function (data) {
           "User-Agent": UserAgent,
         },
         body: JSON.stringify([chunk]),
+        signal: data.signal,
       });
       const parsed = parseBing(res);
       if (parsed == null) {
@@ -122,7 +123,7 @@ const translate: TranslateService["translate"] = async function (data) {
     }
   }
 
-  data.result = parts.join("").trim();
+  return { text: parts.join("").trim() };
 };
 
 export const BingService: TranslateService = {

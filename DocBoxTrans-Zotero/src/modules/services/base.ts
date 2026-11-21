@@ -1,5 +1,4 @@
 import type { HistoryRecord } from "../../utils/history";
-import type { TranslateTask } from "../../utils/task";
 
 /**
  * 翻译错误：message 为「面向用户的完整提示」（如 [配置错误] ...），
@@ -7,9 +6,25 @@ import type { TranslateTask } from "../../utils/task";
  */
 export class TranslateError extends Error {}
 
+/** 引擎只能读取翻译输入，不接触任务状态、历史记录或界面。 */
+export interface TranslationRequest {
+  readonly raw: string;
+  readonly langfrom: string;
+  readonly langto: string;
+  readonly signal?: AbortSignal;
+  /** 流式译文的累计快照，最终结果仍由 translate 返回。 */
+  readonly onProgress?: (text: string) => void;
+}
+
+export interface TranslationResult {
+  readonly text: string;
+}
+
+export type TranslationContext = readonly Readonly<HistoryRecord>[];
+
 /**
  * 翻译服务统一接口（对应 DocBoxTrans 的 ITranslateEngine）。
- * 约定：translate 必须写入 data.result；失败时抛错（由 runner 统一包装成 [请求错误]）。
+ * 约定：translate 返回译文；失败时抛错，由任务管线统一提交结果和更新状态。
  */
 export interface TranslateService {
   /** 服务 id：llm / google / bing / tencent / youdao / cnki。 */
@@ -26,7 +41,7 @@ export interface TranslateService {
    * 不支持上下文的服务应忽略它。
    */
   translate: (
-    data: Required<TranslateTask>,
-    context: HistoryRecord[],
-  ) => Promise<void> | void;
+    data: TranslationRequest,
+    context: TranslationContext,
+  ) => Promise<TranslationResult>;
 }

@@ -9,7 +9,7 @@ service-cnki = 知网
 
 popup-translate = 翻译
 popup-context = 上下文
-popup-context-title = 启用上下文增强翻译（把本篇此前已翻译的相邻片段作为参考）
+popup-context-title = 启用上下文增强翻译（参考本次会话中本文件、同引擎和目标语言的近期译文，不自动读取前后段落）
 popup-empty = 请先在阅读器中选中要翻译的文本。
 
 status-translating = 正在翻译…
@@ -99,3 +99,8 @@ pref-history-hint =
     .value = 翻译记录会持久化保存；在条目面板或阅读器左侧导航的「翻译记录」中查看、搜索、打标签。
 pref-about-version =
     .value = { $name } 版本 { $version }（构建于 { $time }）
+
+pref-preprocessText =
+    .label = 清理 PDF 断行和断词（保留段落、列表和句末边界）
+pref-llm-stream =
+    .label = 逐步显示大模型译文（接口不支持时可关闭）

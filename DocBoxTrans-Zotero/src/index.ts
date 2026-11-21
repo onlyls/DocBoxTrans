@@ -9,6 +9,8 @@ if (!basicTool.getGlobal("Zotero")[config.addonInstance]) {
   _globalThis.Zotero = basicTool.getGlobal("Zotero");
   defineGlobal("crypto");
   defineGlobal("TextEncoder");
+  defineGlobal("AbortController");
+  defineGlobal("IOUtils");
   _globalThis.addon = new Addon();
   defineGlobal("ztoolkit", () => _globalThis.addon.data.ztoolkit);
   // @ts-ignore - Plugin instance is not typed

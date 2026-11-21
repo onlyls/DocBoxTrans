@@ -2,7 +2,7 @@ import { TranslateError } from "./base";
 import type { TranslateService } from "./base";
 import { mapTargetLang } from "../../utils/config";
 import { getPref } from "../../utils/prefs";
-import { HttpStatusError, httpText, truncate } from "../../utils/http";
+import { HttpStatusError, httpText, truncate, requestDelay } from "../../utils/http";
 
 /**
  * 谷歌翻译引擎（免费接口）。移植自 DocBoxTrans 的 GoogleEngine：
@@ -13,10 +13,6 @@ const BuiltinFallbacks = ["https://clients5.google.com/translate_a/t"];
 
 /** endpoint -> 冷却截止时间（ms） */
 const cooldown: Record<string, number> = {};
-
-function delay(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
-}
 
 function endpoints(): string[] {
   const list: string[] = [];
@@ -74,21 +70,22 @@ function parseGoogle(json: string): string | null {
 }
 
 const translate: TranslateService["translate"] = async function (data) {
-  const targetLang = String(getPref("targetLanguage") || "zh-CN");
+  const targetLang = data.langto;
   const eps = orderByHealth(endpoints());
   const attempts = Math.min(4, Math.max(2, eps.length + 1));
   let lastErr = "未知错误";
 
   for (let i = 0; i < attempts; i++) {
+    if (data.signal?.aborted) throw new Error("Request cancelled");
     const ep = eps[i % eps.length];
     try {
       const txt = await httpText("GET", buildUrl(ep, targetLang, data.raw), {
         headers: { Accept: "application/json" },
+        signal: data.signal,
       });
       const parsed = parseGoogle(txt);
       if (parsed != null) {
-        data.result = parsed;
-        return;
+        return { text: parsed };
       }
       lastErr = "响应解析失败";
     } catch (e) {
@@ -99,7 +96,7 @@ const translate: TranslateService["translate"] = async function (data) {
         lastErr = (e as Error)?.message ?? String(e);
       }
     }
-    if (i < attempts - 1) await delay(1000 * (1 << i));
+    if (i < attempts - 1) await requestDelay(1000 * (1 << i), data.signal);
   }
 
   throw new TranslateError(

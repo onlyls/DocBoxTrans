@@ -1,6 +1,6 @@
 import { TranslateError } from "./base";
 import type { TranslateService } from "./base";
-import type { HistoryRecord } from "../../utils/history";
+import type { TranslationContext } from "./base";
 import { mapTargetLang, splitChunks } from "../../utils/config";
 import { getString } from "../../utils/locale";
 import { getPref } from "../../utils/prefs";
@@ -134,7 +134,7 @@ function parseYoudaoLlm(body: string): string {
  * 把此前成功翻译拼成参考提示词（仅用于统一术语与表达，不作为待翻译内容）。
  * prompt 有 1200 字符硬上限，参考价值随距离衰减，因此从最新一条往旧装填。
  */
-function buildPrompt(context: HistoryRecord[]): string | null {
+function buildPrompt(context: TranslationContext): string | null {
   if (!context || context.length === 0) return null;
 
   const head =
@@ -177,7 +177,7 @@ function buildPrompt(context: HistoryRecord[]): string | null {
   return head + parts.join("");
 }
 
-async function translateTextChunk(chunk: string, to: string): Promise<string> {
+async function translateTextChunk(chunk: string, to: string, signal?: AbortSignal): Promise<string> {
   const salt = randomHex32();
   const ct = curTime();
   const sign = await makeSign(chunk, appKey(), secret(), salt, ct);
@@ -197,6 +197,7 @@ async function translateTextChunk(chunk: string, to: string): Promise<string> {
       Accept: "application/json",
     },
     body,
+    signal,
   });
   return parseYoudaoText(res);
 }
@@ -205,6 +206,7 @@ async function translateLlmChunk(
   chunk: string,
   to: string,
   prompt: string | null,
+  signal?: AbortSignal,
 ): Promise<string> {
   const salt = randomHex32();
   const ct = curTime();
@@ -229,6 +231,7 @@ async function translateLlmChunk(
       Accept: "text/event-stream",
     },
     body: formEncode(params),
+    signal,
   });
   return parseYoudaoLlm(txt);
 }
@@ -240,7 +243,7 @@ const translate: TranslateService["translate"] = async function (data, context) 
     );
   }
   const to = mapTargetLang(
-    String(getPref("targetLanguage") || "zh-CN"),
+    data.langto,
     "zh-CHS",
     "zh-CHT",
   );
@@ -250,16 +253,16 @@ const translate: TranslateService["translate"] = async function (data, context) 
       const chunks = splitChunks(data.raw, Math.max(200, MaxLlmChunk));
       const parts: string[] = [];
       for (const c of chunks) {
-        parts.push(await translateLlmChunk(c, to, prompt));
+        parts.push(await translateLlmChunk(c, to, prompt, data.signal));
       }
-      data.result = parts.join("").trim();
+      return { text: parts.join("").trim() };
     } else {
       const chunks = splitChunks(data.raw, MaxChunk);
       const parts: string[] = [];
       for (const c of chunks) {
-        parts.push(await translateTextChunk(c, to));
+        parts.push(await translateTextChunk(c, to, data.signal));
       }
-      data.result = parts.join("").trim();
+      return { text: parts.join("").trim() };
     }
   } catch (e) {
     if (e instanceof HttpStatusError) {

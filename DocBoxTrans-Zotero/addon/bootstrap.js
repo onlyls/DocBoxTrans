@@ -6,6 +6,7 @@ function install(data, reason) {}
 
 async function startup({ id, version, resourceURI, rootURI }, reason) {
   await Zotero.initializationPromise;
+  await Zotero.__addonInstance__?.data.shutdownPromise;
 
   if (!rootURI) {
     rootURI = resourceURI.spec;
@@ -38,12 +39,12 @@ async function onMainWindowUnload({ window }, reason) {
   Zotero.__addonInstance__?.hooks.onMainWindowUnload(window);
 }
 
-function shutdown({ id, version, resourceURI, rootURI }, reason) {
+async function shutdown({ id, version, resourceURI, rootURI }, reason) {
   if (reason === APP_SHUTDOWN) {
     return;
   }
 
-  Zotero.__addonInstance__?.hooks.onShutdown();
+  await Zotero.__addonInstance__?.hooks.onShutdown();
 
   Cc["@mozilla.org/intl/stringbundle;1"]
     .getService(Components.interfaces.nsIStringBundleService)

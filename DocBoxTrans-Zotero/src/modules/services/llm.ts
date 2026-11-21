@@ -1,8 +1,9 @@
 import { TranslateError, TranslateService } from "./base";
-import type { HistoryRecord } from "../../utils/history";
+import type { TranslationContext } from "./base";
 import { getString } from "../../utils/locale";
 import { getPref } from "../../utils/prefs";
-import { HttpStatusError, httpJson, truncate } from "../../utils/http";
+import { HttpStatusError, httpJson, httpText, truncate } from "../../utils/http";
+import { ChatCompletionStream } from "./chatStream";
 
 /**
  * 大模型引擎（OpenAI 兼容 /chat/completions）。移植自 DocBoxTrans 的 LlmEngine。
@@ -12,16 +13,35 @@ const ContextGuidance =
   "\n\n以下是之前已完成翻译的原文与译文（成对给出），仅用于统一术语、缩写与表达习惯；" +
   "请勿翻译这些内容，只翻译最后一条用户消息，并且只输出译文本身。";
 
+const DefaultSystemPrompt =
+  "你是专业的翻译引擎。把用户提供的文本翻译成{targetLanguage}，只输出译文本身，不要任何解释、标注或原文。保留原有的换行和标点结构。";
+const LegacySystemPrompt = DefaultSystemPrompt.replace("{targetLanguage}", "简体中文");
+
+function readTemperature(): number {
+  const raw = String(getPref("llm.temperature") ?? "").trim();
+  const value = raw ? Number(raw) : 0.2;
+  if (!Number.isFinite(value) || value < 0 || value > 2) {
+    throw new TranslateError(getString("status-invalid-temperature"));
+  }
+  return value;
+}
+
 function buildBody(
   model: string,
   temperature: number,
   systemPrompt: string,
   text: string,
-  context: HistoryRecord[],
+  targetLanguage: string,
+  context: TranslationContext,
+  stream = false,
 ): string {
   const hasCtx = context && context.length > 0;
   const messages: Array<{ role: string; content: string }> = [];
-  let sys = systemPrompt || "";
+  const template = !systemPrompt || systemPrompt === LegacySystemPrompt
+    ? DefaultSystemPrompt : systemPrompt;
+  let sys = template.split("{targetLanguage}").join(targetLanguage);
+  // 兼容已有自定义模板，明确以本次任务的目标语言为准。
+  sys += `\n\nTarget language: ${targetLanguage}. This target language overrides any other target language specified above. Output only the translation.`;
   if (hasCtx) sys = sys + ContextGuidance;
   messages.push({ role: "system", content: sys });
   if (hasCtx) {
@@ -36,7 +56,7 @@ function buildBody(
   return JSON.stringify({
     model,
     temperature,
-    stream: false,
+    stream,
     messages,
   });
 }
@@ -47,8 +67,8 @@ function extractContent(res: any): string | null {
     if (Array.isArray(choices) && choices.length > 0) {
       const c0 = choices[0];
       const content = c0?.message?.content;
-      if (typeof content === "string") return content.trim();
-      if (typeof c0?.text === "string") return c0.text.trim();
+      if (typeof content === "string") return content.trim() || null;
+      if (typeof c0?.text === "string") return c0.text.trim() || null;
     }
     return null;
   } catch {
@@ -75,7 +95,7 @@ const translate: TranslateService["translate"] = async function (data, context) 
   const apiKey = String(getPref("llm.apiKey") || "").trim();
   const endpoint = String(getPref("llm.endpoint") || "").trim();
   const model = String(getPref("llm.model") || "").trim();
-  const temperature = Number(getPref("llm.temperature")) || 0.2;
+  const temperature = readTemperature();
   const systemPrompt = String(getPref("llm.systemPrompt") || "");
 
   if (!apiKey) {
@@ -87,15 +107,35 @@ const translate: TranslateService["translate"] = async function (data, context) 
     throw new TranslateError("[配置错误] 还没有填写大模型接口地址。");
   }
 
-  const body = buildBody(model, temperature, systemPrompt, data.raw, context);
+  const stream = getPref("llm.stream") !== false && Boolean(data.onProgress);
+  const body = buildBody(model, temperature, systemPrompt, data.raw, data.langto, context, stream);
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: "Bearer " + apiKey,
+    Accept: stream ? "text/event-stream, application/json" : "application/json",
+  };
   try {
+    if (stream) {
+      const parser = new ChatCompletionStream(text => data.onProgress?.(text));
+      const response = await httpText("POST", endpoint, {
+        headers, body, signal: data.signal,
+        onTextChunk: chunk => parser.feed(chunk),
+      });
+      // 部分兼容服务忽略 stream，直接返回普通 JSON；使用同一次响应，不额外计费。
+      if (response.trimStart().startsWith("{")) {
+        const res = JSON.parse(response);
+        const err = extractErrorFromResponse(res);
+        if (err) throw new TranslateError(err);
+        const text = extractContent(res);
+        if (!text) throw new TranslateError(getString("status-empty-result"));
+        return { text };
+      }
+      return { text: parser.finish() };
+    }
     const res = await httpJson("POST", endpoint, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + apiKey,
-        Accept: "application/json",
-      },
+      headers,
       body,
+      signal: data.signal,
     });
     const err = extractErrorFromResponse(res);
     if (err) throw new TranslateError(err);
@@ -105,7 +145,7 @@ const translate: TranslateService["translate"] = async function (data, context) 
         "[响应解析失败]\n" + truncate(JSON.stringify(res ?? ""), 400),
       );
     }
-    data.result = content;
+    return { text: content };
   } catch (e) {
     if (e instanceof HttpStatusError) {
       const m = extractErrorFromBody(e.body);
@@ -130,7 +170,6 @@ export async function probeConnection(): Promise<{ ok: boolean; message: string 
   const apiKey = String(getPref("llm.apiKey") || "").trim();
   const endpoint = String(getPref("llm.endpoint") || "").trim();
   const model = String(getPref("llm.model") || "").trim();
-  const temperature = Number(getPref("llm.temperature")) || 0.2;
   const systemPrompt = String(getPref("llm.systemPrompt") || "");
 
   if (!apiKey || !endpoint) {
@@ -139,13 +178,15 @@ export async function probeConnection(): Promise<{ ok: boolean; message: string 
 
   const started = Date.now();
   try {
+    const temperature = readTemperature();
     const res = await httpJson("POST", endpoint, {
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer " + apiKey,
         Accept: "application/json",
       },
-      body: buildBody(model, temperature, systemPrompt, "Hello", []),
+      body: buildBody(model, temperature, systemPrompt, "Hello",
+        String(getPref("targetLanguage") || "zh-CN"), []),
       timeout: 20000,
     });
     const err = extractErrorFromResponse(res);

@@ -1,4 +1,6 @@
 import type { RecordPosition } from "./history";
+import { getPref } from "./prefs";
+import { mergeFragments, preprocessPdfText } from "./text";
 
 /**
  * 拼接翻译（拼合区）的会话级暂存。
@@ -41,8 +43,11 @@ export function add(
   itemId: number | undefined,
   text: string,
   position?: RecordPosition,
+  isPdf?: boolean,
 ): boolean {
-  const t = (text ?? "").trim();
+  const pdf = isPdf ?? typeof position?.pageIndex === "number";
+  const t = pdf && getPref("preprocessText") !== false
+    ? preprocessPdfText(text ?? "") : (text ?? "").trim();
   if (!t) return false;
   const key = keyOf(itemId);
   const arr = baskets.get(key) ?? [];
@@ -50,6 +55,17 @@ export function add(
   arr.push({ id: Zotero.Utilities.randomString(12), text: t, position });
   while (arr.length > MAX_ITEMS) arr.shift();
   baskets.set(key, arr);
+  return true;
+}
+
+/** 仅改变顺序，不更换片段 id，确保在途翻译仍能按快照清理。 */
+export function move(itemId: number | undefined, id: string, direction: -1 | 1): boolean {
+  const items = baskets.get(keyOf(itemId));
+  if (!items) return false;
+  const from = items.findIndex(item => item.id === id);
+  const to = from + direction;
+  if (from < 0 || to < 0 || to >= items.length) return false;
+  [items[from], items[to]] = [items[to], items[from]];
   return true;
 }
 
@@ -72,10 +88,7 @@ export function clear(itemId?: number): boolean {
 
 /** 拼接指定文档的全部片段为一段文本（空格相连）；无内容时返回空串。 */
 export function join(itemId?: number): string {
-  return list(itemId)
-    .map((x) => x.text)
-    .join(" ")
-    .trim();
+  return mergeFragments(list(itemId).map(item => item.text));
 }
 
 /** 拼合区首段的位置（供拼合翻译后跳回原文）。 */
