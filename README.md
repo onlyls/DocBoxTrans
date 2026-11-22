@@ -1,7 +1,7 @@
 # DocBoxTrans
 
 > 面向文献阅读的**划词翻译**工具集：桌面端打通稻壳阅读器，插件端打通 Zotero，共享同一套翻译引擎与「上下文增强翻译」能力。
-
+[![Zotero 中文社区 · 已收录](https://zotero-chinese.com/badges/listed.svg)](https://zotero-chinese.com/plugins/)
 本仓库包含两个子项目，二者面向不同的阅读场景，但采用一致的翻译服务与设计语言：
 
 | 子项目 | 平台 | 技术栈 | 说明 |
