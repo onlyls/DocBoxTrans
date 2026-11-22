@@ -1,6 +1,6 @@
 {
   "name": "docboxtrans-zotero",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "在 Zotero 阅读器中划词翻译，移植 DocBoxTrans 的翻译引擎与「上下文增强翻译」。",
   "config": {
     "addonName": "DocBoxTrans for Zotero",
@@ -13,7 +13,7 @@
   "scripts": {
     "start": "zotero-plugin serve",
     "build": "tsc --noEmit && zotero-plugin build",
-    "test": "node --test tests/stability.test.cjs tests/structure.test.cjs tests/reading.test.cjs tests/context.test.cjs",
+    "test": "node --test tests/stability.test.cjs tests/structure.test.cjs tests/reading.test.cjs tests/context.test.cjs tests/services.test.cjs",
     "release": "zotero-plugin release"
   },
   "repository": {
@@ -28,6 +28,7 @@
     "zotero-plugin-toolkit": "^6.0.0"
   },
   "devDependencies": {
+    "@fluent/syntax": "0.19.0",
     "typescript": "^5.9.3",
     "zotero-plugin-scaffold": "^0.8.2",
     "zotero-types": "^4.1.0-beta.3"

@@ -1,14 +1,16 @@
 import { config, homepage } from "../../package.json";
 import { getString } from "../utils/locale";
 import { getPref, setPref } from "../utils/prefs";
-import { services } from "./services";
-import { probeConnection as probeLlm } from "./services/llm";
+import { preferencesPaneId, registerServicePreferences } from "./servicePreferences";
 import { probeConnection as probeYoudao } from "./services/youdao";
 
 /** 注册 Zotero 7 偏好设置面板。 */
 export function registerPrefsWindow() {
   Zotero.PreferencePanes.register({
     pluginID: config.addonID,
+    defaultXUL: true,
+    id: preferencesPaneId,
+    stylesheets: [rootURI + "chrome/content/preferences.css"],
     src: rootURI + "chrome/content/preferences.xhtml",
     label: getString("pref-title"),
     // 首选项侧栏图标与 Zotero 内置面板同为 20*20；Zotero 以原生尺寸渲染，传 48px 会被裁切
@@ -17,11 +19,10 @@ export function registerPrefsWindow() {
   });
 }
 
-/** 偏好面板打开时调用：记录窗口并动态填充服务下拉框。 */
+/** 偏好面板打开时调用：绑定分类、服务编辑器及即时保存的内置配置。 */
 export function registerPrefsScripts(win: Window) {
   addon.data.prefs.window = win;
-  buildServiceMenulist(win);
-  bindSystemPrompt(win);
+  registerServicePreferences(win);
   bindYoudaoMode(win);
   bindSecretToggles(win);
   bindConnectionTests(win);
@@ -30,7 +31,6 @@ export function registerPrefsScripts(win: Window) {
 /** 密钥 / 应用 ID 等敏感字段：默认以密码框显示，勾选「显示」后才临时明文。 */
 function bindSecretToggles(win: Window) {
   const pairs: Array<[string, string]> = [
-    ["llm-apiKey", "llm-apiKey-show"],
     ["youdao-appKey", "youdao-appKey-show"],
     ["youdao-secret", "youdao-secret-show"],
   ];
@@ -52,7 +52,6 @@ function bindSecretToggles(win: Window) {
 
 /** 「测试连接」按钮：用当前设置发一次探测请求，把结果写到下方的说明文字里。 */
 function bindConnectionTests(win: Window) {
-  bindConnectionTest(win, "llm-test", "llm-testResult", probeLlm);
   bindConnectionTest(win, "youdao-test", "youdao-testResult", probeYoudao);
 }
 
@@ -94,19 +93,6 @@ function setTestResult(el: XUL.Label, text: string, color: string) {
   el.style.color = color;
 }
 
-/** 系统提示词是 XUL textarea，Zotero 默认不做 preference 绑定，这里手动读写。 */
-function bindSystemPrompt(win: Window) {
-  const el = win.document.querySelector(
-    `#${config.addonRef}-llm-systemPrompt`,
-  ) as HTMLTextAreaElement | null;
-  if (!el) return;
-  el.value = String(getPref("llm.systemPrompt") || "");
-  el.addEventListener("input", () => {
-    setPref("llm.systemPrompt", el.value);
-  });
-}
-
-/** 有道模式 menulist 同样手动读写，避免依赖 preference 绑定。 */
 function bindYoudaoMode(win: Window) {
   const el = win.document.querySelector(
     `#${config.addonRef}-youdao-mode`,
@@ -117,43 +103,4 @@ function bindYoudaoMode(win: Window) {
     const value = el.getAttribute("value");
     if (value) setPref("youdao.mode", value);
   });
-}
-
-function buildServiceMenulist(win: Window) {
-  const doc = win.document;
-  const placeholder = doc.querySelector(
-    `#${config.addonRef}-serviceSource-placeholder`,
-  );
-  if (!placeholder) return;
-
-  const current = String(getPref("translateSource") || "llm");
-  ztoolkit.UI.replaceElement(
-    {
-      tag: "menulist",
-      id: `${config.addonRef}-serviceSource`,
-      attributes: { value: current, native: "true" },
-      listeners: [
-        {
-          type: "command",
-          listener: (e: Event) => {
-            const value = (e.target as XUL.Element).getAttribute("value");
-            if (value) setPref("translateSource", value);
-          },
-        },
-      ],
-      children: [
-        {
-          tag: "menupopup",
-          children: services.getAll().map((s) => ({
-            tag: "menuitem",
-            attributes: {
-              label: services.getDisplayName(s.id),
-              value: s.id,
-            },
-          })),
-        },
-      ],
-    },
-    placeholder as XUL.Element,
-  );
 }

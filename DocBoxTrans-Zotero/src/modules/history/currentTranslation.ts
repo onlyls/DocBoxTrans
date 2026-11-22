@@ -6,6 +6,8 @@ import { getLastTask, cancelTranslationTask } from "../../utils/task";
 import * as combineStore from "../../utils/combineStore";
 import { applyDisabledStyle } from "../../utils/uiStyle";
 import { services } from "../services";
+import { buildServiceVisibility } from "../serviceVisibility";
+import { selectService } from "../serviceConfig";
 import { rerunWith, translateCombined, refreshCombineViews, addSelectionToCombine, forceRetranslate } from "../translationActions";
 import { buildCombineChip } from "../combineChips";
 import { primaryActionLabel, taskStatusText } from "../translationControls";
@@ -49,11 +51,12 @@ function refreshCurrent(root: HTMLElement, doc: Document, onChanged: () => void)
   row.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:4px;";
 
   const current = String(getPref("translateSource") || "llm");
-  for (const s of services.getAll()) {
+  for (const s of services.getVisible()) {
     const btn = doc.createElement("button");
     btn.type = "button";
     btn.textContent = services.getDisplayName(s.id);
-    btn.style.cssText = paneServiceBtnStyle(s.id === current);
+    btn.style.cssText = paneServiceBtnStyle(s.id === current) +
+      "max-width:100%;white-space:normal;overflow-wrap:anywhere;";
     btn.addEventListener("click", (ev) => {
       ev.stopPropagation();
       rerunCurrent(root, s.id, onChanged);
@@ -61,6 +64,7 @@ function refreshCurrent(root: HTMLElement, doc: Document, onChanged: () => void)
     row.appendChild(btn);
   }
   box.appendChild(row);
+  box.appendChild(buildServiceVisibility(doc, root));
 
   // 拼接翻译：单行内「拼接模式 + 加入当前选区 + 清空 + 翻译（计数）+ 片段胶囊」
   box.appendChild(buildCombineArea(root, doc, scope, onChanged));
@@ -220,7 +224,7 @@ function rerunCurrent(root: HTMLElement, service: string | undefined, onChanged:
   const useTask =
     task && historyStore.itemInScope(task.itemId, scope.id) ? task : undefined;
   if (service && String(getPref("translateSource")) !== service) {
-    setPref("translateSource", service);
+    selectService(service);
   }
   // 本范围内没有可复用的任务、且当前选区也不属于本范围时：不新建，避免把别处的选区译到本面板
   if (!useTask && !historyStore.itemInScope(state?.itemId, scope.id)) {

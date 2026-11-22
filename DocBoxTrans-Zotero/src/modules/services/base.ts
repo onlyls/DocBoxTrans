@@ -27,7 +27,7 @@ export type TranslationContext = readonly Readonly<HistoryRecord>[];
  * 约定：translate 返回译文；失败时抛错，由任务管线统一提交结果和更新状态。
  */
 export interface TranslateService {
-  /** 服务 id：llm / google / bing / tencent / youdao / cnki。 */
+  /** 稳定服务 ID：llm / llm-* / google / bing / tencent / youdao / cnki。 */
   id: string;
   /** 服务类型，本插件当前只有整句翻译。 */
   type: "sentence";

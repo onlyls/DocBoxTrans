@@ -4,6 +4,8 @@ pref("__prefsPrefix__.translateSource", "llm");
 pref("__prefsPrefix__.targetLanguage", "zh-CN");
 pref("__prefsPrefix__.fontSize", "12");
 pref("__prefsPrefix__.showServiceSelector", true);
+// Versioned model profiles, visible service IDs and deleted service names.
+pref("__prefsPrefix__.services.config", "");
 
 pref("__prefsPrefix__.reuseTranslation", true);
 pref("__prefsPrefix__.preprocessText", true);

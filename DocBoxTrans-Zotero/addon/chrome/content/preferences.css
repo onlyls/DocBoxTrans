@@ -1,0 +1,27 @@
+.dbt-settings { color: var(--color-text-primary, inherit); width: 100%; min-width: 0; }
+.dbt-settings [hidden] { display: none !important; }
+.dbt-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--fill-quaternary, #8885); padding-bottom: 8px; margin-bottom: 16px; }
+.dbt-settings button { font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--fill-quaternary, #8885); border-radius: 5px; background: var(--material-background, transparent); padding: 6px 10px; }
+.dbt-settings button:hover { background: var(--fill-quaternary, #8882); }
+.dbt-settings button[aria-selected="true"], .dbt-settings .dbt-active { background: var(--fill-quaternary, #8883); border-color: var(--color-accent, #4072e5); }
+.dbt-settings button:focus-visible, .dbt-settings input:focus-visible, .dbt-settings textarea:focus-visible { outline: 2px solid var(--color-accent, #4072e5); outline-offset: 2px; }
+.dbt-settings button:disabled { opacity: .5; cursor: default; }
+.dbt-settings hbox { flex-wrap: wrap; gap: 6px; align-items: center; margin-block: 6px; }
+.dbt-settings input:not([type="checkbox"]), .dbt-settings textarea { box-sizing: border-box; max-width: 100%; min-width: 0 !important; font: inherit; color: inherit; }
+.dbt-settings input[type="text"], .dbt-settings input[type="password"] { flex: 1; }
+.dbt-settings input[id$="-fontSize"] { flex: 0 1 80px; }
+.dbt-settings input[id$="-targetLanguage"] { flex: 0 1 160px; }
+.dbt-settings groupbox { min-width: 0; margin: 0 0 14px; }
+.dbt-hint { opacity: .75; font-size: .92em; line-height: 1.5; }
+.dbt-service-layout { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.dbt-service-navigation { flex: 1 1 165px; min-width: 0; }
+.dbt-service-details { flex: 3 1 270px; min-width: 0; }
+.dbt-service-row { display: flex; align-items: center; gap: 6px; padding-block: 4px; }
+.dbt-service-row input { flex: none; }
+.dbt-service-row .dbt-service-edit { flex: 1; min-width: 0; text-align: start; overflow-wrap: anywhere; }
+.dbt-model-form { display: flex; flex-direction: column; gap: 10px; }
+.dbt-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dbt-field input, .dbt-field textarea { width: 100%; }
+.dbt-field textarea { min-height: 100px; resize: vertical; }
+.dbt-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dbt-form-status { min-height: 1.3em; white-space: pre-wrap; overflow-wrap: anywhere; }

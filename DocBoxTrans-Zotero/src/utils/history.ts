@@ -12,7 +12,7 @@ export interface HistoryRecord {
   createdAt: string;
   /** 源语言。源语言始终为自动检测，固定为 "auto"。 */
   sourceLanguage: string;
-  /** 翻译引擎标识：llm / google / bing / tencent / youdao / cnki。 */
+  /** 稳定服务 ID：llm / llm-* / google / bing / tencent / youdao / cnki。 */
   provider: string;
   /** 目标语言（记录时的 targetLanguage）。 */
   targetLanguage: string;

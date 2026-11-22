@@ -228,7 +228,7 @@ function shortDate(createdAt: string): string {
 }
 
 function providerName(id: string): string {
-  return services.getById(id) ? services.getDisplayName(id) : id;
+  return services.getDisplayName(id);
 }
 
 /** 点击记录「服务来源」区域：跳回该原文在文档中的位置（找不到已打开的阅读器则新开）。 */

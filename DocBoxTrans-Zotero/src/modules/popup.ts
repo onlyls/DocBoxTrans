@@ -5,6 +5,7 @@ import { getLastTask } from "../utils/task";
 import * as combineStore from "../utils/combineStore";
 import { pillStyle, applyDisabledStyle, PILL_PADDING_COMPACT } from "../utils/uiStyle";
 import { services } from "./services";
+import { selectService } from "./serviceConfig";
 import { rerunWith, translatePrimary, addSelectionToCombine, refreshCombineViews, forceRetranslate } from "./translationActions";
 
 import { buildCombineChip } from "./combineChips";
@@ -37,12 +38,13 @@ function serviceButtonStyle(active: boolean, fs: number): Record<string, string>
 function serviceButtons(state: ReaderState): any[] {
   const fs = fontSize();
   const current = String(getPref("translateSource") || "llm");
-  return services.getAll().map((s) => ({
+  return services.getVisible().map((s) => ({
     tag: "button",
     namespace: "html",
     attributes: { type: "button", [SERVICE_ATTR]: s.id },
     classList: [`${config.addonRef}-readerpopup`, `${config.addonRef}-service-btn`],
-    styles: serviceButtonStyle(s.id === current, fs),
+    styles: { ...serviceButtonStyle(s.id === current, fs),
+      maxWidth: "100%", whiteSpace: "normal", overflowWrap: "anywhere" },
     properties: { textContent: services.getDisplayName(s.id) },
     listeners: [
       {
@@ -52,7 +54,7 @@ function serviceButtons(state: ReaderState): any[] {
           const id = btn.getAttribute(SERVICE_ATTR) || "";
           if (!id) return;
           if (String(getPref("translateSource")) !== id) {
-            setPref("translateSource", id);
+            selectService(id);
           }
           updateServiceButtons(state);
           rerunWith(getLastTask(state.itemId, state.readerId), { service: id }, state);
@@ -74,6 +76,21 @@ function updateServiceButtons(state: ReaderState) {
       const isActive = el.getAttribute(SERVICE_ATTR) === current;
       Object.assign((el as HTMLElement).style, serviceButtonStyle(isActive, fs));
     });
+}
+
+/** Rebuild only the service row when names/visibility change; preserve reader state. */
+export function refreshReaderServices() {
+  for (const state of getReaderStates()) {
+    try {
+      const row = state.currentPopup?.querySelector(`#${makeId(state, "services")}`);
+      if (!row) continue;
+      row.replaceChildren(ztoolkit.UI.createElement(row.ownerDocument, "fragment", {
+        children: serviceButtons(state),
+      }));
+    } catch (e) {
+      Zotero.logError(e instanceof Error ? e : new Error(String(e)));
+    }
+  }
 }
 
 /** 按文本长度估算合适的弹窗宽度。 */

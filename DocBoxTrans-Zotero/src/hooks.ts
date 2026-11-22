@@ -12,7 +12,9 @@ import {
   installGoogleProxyFilter,
   uninstallGoogleProxyFilter,
 } from "./utils/http";
-import { buildReaderPopup, updateReaderPopup } from "./modules/popup";
+import { buildReaderPopup, updateReaderPopup, refreshReaderServices } from "./modules/popup";
+import { subscribeServiceConfig } from "./modules/serviceConfig";
+import { disposeServicePreferences } from "./modules/servicePreferences";
 import { addSelectionToCombine, createNewTaskFromSelection, translateCombined } from "./modules/translationActions";
 import { subscribeTranslationUpdates } from "./utils/translationEvents";
 
@@ -20,6 +22,7 @@ import { runTranslationTask, stopTranslationTasks } from "./utils/task";
 import { clearReaderStates, getActiveReaderState, getReaderState } from "./modules/readerState";
 
 let unsubscribeTranslationUpdates: (() => void) | undefined;
+let unsubscribeServiceConfig: (() => void) | undefined;
 
 async function onStartup() {
   await Promise.all([
@@ -43,7 +46,17 @@ async function onStartup() {
   } catch (e) {
     Zotero.logError(e instanceof Error ? e : new Error(String(e)));
   }
-  setDefaultPrefs();
+  try {
+    setDefaultPrefs();
+  } catch (e) {
+    // Keep the settings pane available for diagnosis; never replace damaged data.
+    Zotero.logError(e instanceof Error ? e : new Error(String(e)));
+  }
+  unsubscribeServiceConfig?.();
+  unsubscribeServiceConfig = subscribeServiceConfig(() => {
+    refreshReaderServices();
+    refreshHistoryPanes();
+  });
 
   // 逐步注册：任一步失败都不影响其它功能，并把原因写入 Zotero 调试输出（帮助 → 调试输出）
   try {
@@ -168,6 +181,9 @@ function onShutdown(): Promise<void> {
 
 async function shutdownAddon() {
   addon.data.alive = false;
+  unsubscribeServiceConfig?.();
+  unsubscribeServiceConfig = undefined;
+  disposeServicePreferences();
   unsubscribeTranslationUpdates?.();
   unsubscribeTranslationUpdates = undefined;
   try {

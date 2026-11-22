@@ -16,8 +16,10 @@ export function rerunWith(
 ) {
   if (state) state.resultCleared = false;
   // 每次重译使用新对象，旧请求即使晚返回也不能改写新任务。
+  // 配置默认服务或隐藏旧服务不自动重译；下一次操作使用当前前台选中的服务。
   const created = task
-    ? createTask(task.originalRaw ?? task.raw, task.itemId, patch.service || task.service,
+    ? createTask(task.originalRaw ?? task.raw, task.itemId,
+        patch.service || String(getPref("translateSource") || task.service),
         task.position, task.combined, task.readerId, task.isPdf)
     : state ? createNewTaskFromSelection(state, patch.service) : undefined;
   if (created) void runTranslationTask(created, {

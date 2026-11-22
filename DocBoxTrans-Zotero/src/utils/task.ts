@@ -21,7 +21,7 @@ export interface TranslateTask {
   error?: string;
   /** 译文或错误提示。 */
   result: string;
-  /** 服务 id：llm / google / bing / tencent / youdao / cnki。 */
+  /** 稳定服务 ID：llm / llm-* / google / bing / tencent / youdao / cnki。 */
   service: string;
   /** 阅读器实例标识，同一附件在不同窗口中打开时仍独立。 */
   readerId?: string;

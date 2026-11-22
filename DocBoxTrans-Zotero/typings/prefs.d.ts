@@ -13,6 +13,7 @@ declare namespace _ZoteroTypes {
       "targetLanguage": string;
       "fontSize": string;
       "showServiceSelector": boolean;
+      "services.config": string;
       "reuseTranslation": boolean;
       "preprocessText": boolean;
       "llm.stream": boolean;

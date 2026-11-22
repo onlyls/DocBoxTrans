@@ -1,10 +1,15 @@
 <linkset>
   <html:link rel="localization" href="__addonRef__-preferences.ftl" />
 </linkset>
-<vbox
-  id="zotero-prefpane-__addonRef__"
-  onload="Zotero.__addonInstance__.hooks.onPrefsLoad(event)"
->
+<vbox id="zotero-prefpane-__addonRef__" onload="Zotero.__addonInstance__.hooks.onPrefsLoad(event)">
+<html:div id="__addonRef__-settings" class="dbt-settings">
+  <html:div class="dbt-tabs" role="tablist" data-l10n-id="pref-tabs-label">
+    <html:button type="button" id="__addonRef__-tab-general" role="tab" aria-controls="__addonRef__-panel-general" aria-selected="true" tabindex="0" data-l10n-id="pref-tab-general"></html:button>
+    <html:button type="button" id="__addonRef__-tab-services" role="tab" aria-controls="__addonRef__-panel-services" aria-selected="false" tabindex="-1" data-l10n-id="pref-tab-services"></html:button>
+    <html:button type="button" id="__addonRef__-tab-reading" role="tab" aria-controls="__addonRef__-panel-reading" aria-selected="false" tabindex="-1" data-l10n-id="pref-tab-reading"></html:button>
+    <html:button type="button" id="__addonRef__-tab-about" role="tab" aria-controls="__addonRef__-panel-about" aria-selected="false" tabindex="-1" data-l10n-id="pref-tab-about"></html:button>
+  </html:div>
+  <html:section id="__addonRef__-panel-general" role="tabpanel" aria-labelledby="__addonRef__-tab-general">
   <groupbox>
     <label><html:h2 data-l10n-id="pref-general"></html:h2></label>
     <checkbox
@@ -33,17 +38,10 @@
         preference="__prefsPrefix__.fontSize"
       ></html:input>
     </hbox>
-    <checkbox id="__addonRef__-preprocessText" data-l10n-id="pref-preprocessText"
-      native="true" preference="__prefsPrefix__.preprocessText" />
-  </groupbox>
 
+  </groupbox>
   <groupbox>
     <label><html:h2 data-l10n-id="pref-service"></html:h2></label>
-    <hbox align="center">
-      <label data-l10n-id="pref-service-source"></label>
-      <!-- 由 preferenceWindow.ts 动态填充 -->
-      <box id="__addonRef__-serviceSource-placeholder"></box>
-    </hbox>
     <hbox align="center">
       <label data-l10n-id="pref-service-targetLanguage"></label>
       <html:input
@@ -53,68 +51,19 @@
         style="min-width: 120px"
       ></html:input>
     </hbox>
-    <label data-l10n-id="pref-service-hint"></label>
+    <html:p class="dbt-hint" data-l10n-id="pref-service-hint"></html:p>
   </groupbox>
-
-  <groupbox>
-    <label><html:h2 data-l10n-id="pref-llm"></html:h2></label>
-    <checkbox id="__addonRef__-llm-stream" data-l10n-id="pref-llm-stream"
-      native="true" preference="__prefsPrefix__.llm.stream" />
-    <hbox align="center">
-      <label data-l10n-id="pref-llm-endpoint"></label>
-      <html:input
-        id="__addonRef__-llm-endpoint"
-        type="text"
-        preference="__prefsPrefix__.llm.endpoint"
-        style="min-width: 320px"
-      ></html:input>
-    </hbox>
-    <hbox align="center">
-      <label data-l10n-id="pref-llm-model"></label>
-      <html:input
-        id="__addonRef__-llm-model"
-        type="text"
-        preference="__prefsPrefix__.llm.model"
-      ></html:input>
-      <label data-l10n-id="pref-llm-temperature"></label>
-      <html:input
-        id="__addonRef__-llm-temperature"
-        type="text"
-        preference="__prefsPrefix__.llm.temperature"
-        style="max-width: 60px"
-      ></html:input>
-    </hbox>
-    <hbox align="center">
-      <label data-l10n-id="pref-llm-apiKey"></label>
-      <html:input
-        id="__addonRef__-llm-apiKey"
-        type="password"
-        preference="__prefsPrefix__.llm.apiKey"
-        style="min-width: 240px"
-      ></html:input>
-      <checkbox
-        id="__addonRef__-llm-apiKey-show"
-        data-l10n-id="pref-secret-show"
-        native="true"
-      />
-    </hbox>
-    <hbox align="center">
-      <button
-        id="__addonRef__-llm-test"
-        data-l10n-id="pref-test-connection"
-      ></button>
-    </hbox>
-    <label id="__addonRef__-llm-testResult"></label>
-    <label data-l10n-id="pref-llm-systemPrompt"></label>
-    <!-- 必须用 html:textarea：XUL 的 <textarea> 在 Zotero 7+（Firefox 115 起）已无元素定义，会渲染成不可见的空元素 -->
-    <html:textarea
-      id="__addonRef__-llm-systemPrompt"
-      rows="4"
-      style="min-width: 360px; min-height: 76px"
-    ></html:textarea>
-  </groupbox>
-
-  <groupbox>
+  </html:section>
+  <html:section id="__addonRef__-panel-services" role="tabpanel" aria-labelledby="__addonRef__-tab-services" hidden="hidden">
+    <html:p class="dbt-hint" data-l10n-id="pref-services-intro"></html:p>
+    <html:div class="dbt-service-layout">
+      <html:div class="dbt-service-navigation">
+        <html:button id="__addonRef__-service-add" type="button" data-l10n-id="pref-service-add"></html:button>
+        <html:div id="__addonRef__-service-list" role="group" data-l10n-id="pref-service-list"></html:div>
+      </html:div>
+      <html:div class="dbt-service-details">
+        <html:div id="__addonRef__-llm-editor"></html:div>
+        <html:div id="__addonRef__-builtin-youdao" hidden="hidden">  <groupbox>
     <label><html:h2 data-l10n-id="pref-youdao"></html:h2></label>
     <hbox align="center">
       <label data-l10n-id="pref-youdao-appKey"></label>
@@ -164,54 +113,55 @@
       ></button>
     </hbox>
     <label id="__addonRef__-youdao-testResult"></label>
-    <label data-l10n-id="pref-youdao-hint"></label>
-  </groupbox>
-
-  <groupbox>
-    <label><html:h2 data-l10n-id="pref-engines"></html:h2></label>
-    <hbox align="center">
+    <html:p class="dbt-hint" data-l10n-id="pref-youdao-hint"></html:p>
+  </groupbox></html:div>
+        <html:div id="__addonRef__-builtin-google" hidden="hidden">    <hbox align="center">
       <label data-l10n-id="pref-google-endpoint"></label>
       <html:input
         type="text"
         preference="__prefsPrefix__.google.endpoint"
         style="min-width: 300px"
       ></html:input>
-    </hbox>
-    <hbox align="center">
+    </hbox>    <hbox align="center">
       <label data-l10n-id="pref-google-proxy"></label>
       <html:input
         type="text"
         preference="__prefsPrefix__.google.proxy"
         style="min-width: 300px"
       ></html:input>
-    </hbox>
-    <hbox align="center">
+    </hbox></html:div>
+        <html:div id="__addonRef__-builtin-bing" hidden="hidden">    <hbox align="center">
       <label data-l10n-id="pref-bing-endpoint"></label>
       <html:input
         type="text"
         preference="__prefsPrefix__.bing.endpoint"
         style="min-width: 300px"
       ></html:input>
-    </hbox>
-    <hbox align="center">
+    </hbox></html:div>
+        <html:div id="__addonRef__-builtin-tencent" hidden="hidden">    <hbox align="center">
       <label data-l10n-id="pref-tencent-endpoint"></label>
       <html:input
         type="text"
         preference="__prefsPrefix__.tencent.endpoint"
         style="min-width: 300px"
       ></html:input>
-    </hbox>
-    <hbox align="center">
+    </hbox></html:div>
+        <html:div id="__addonRef__-builtin-cnki" hidden="hidden">    <hbox align="center">
       <label data-l10n-id="pref-cnki-maxChars"></label>
       <html:input
         type="text"
         preference="__prefsPrefix__.cnki.maxChars"
         style="max-width: 80px"
       ></html:input>
-    </hbox>
-    <label data-l10n-id="pref-engines-hint"></label>
-  </groupbox>
-
+    </hbox></html:div>
+        <html:p id="__addonRef__-builtin-hint" class="dbt-hint" hidden="hidden" data-l10n-id="pref-builtin-hint"></html:p>
+        <html:p id="__addonRef__-service-message" role="status" aria-live="polite"></html:p>
+      </html:div>
+    </html:div>
+  </html:section>
+  <html:section id="__addonRef__-panel-reading" role="tabpanel" aria-labelledby="__addonRef__-tab-reading" hidden="hidden">
+    <checkbox id="__addonRef__-preprocessText" data-l10n-id="pref-preprocessText"
+      native="true" preference="__prefsPrefix__.preprocessText" />
   <groupbox>
     <label><html:h2 data-l10n-id="pref-context"></html:h2></label>
     <checkbox
@@ -236,9 +186,8 @@
         style="max-width: 100px"
       ></html:input>
     </hbox>
-    <label data-l10n-id="pref-context-hint"></label>
+    <html:p class="dbt-hint" data-l10n-id="pref-context-hint"></html:p>
   </groupbox>
-
   <groupbox>
     <label><html:h2 data-l10n-id="pref-combine"></html:h2></label>
     <hbox align="center">
@@ -259,9 +208,8 @@
         style="min-width: 140px"
       ></html:input>
     </hbox>
-    <label data-l10n-id="pref-combine-hint"></label>
+    <html:p class="dbt-hint" data-l10n-id="pref-combine-hint"></html:p>
   </groupbox>
-
   <groupbox>
     <label><html:h2 data-l10n-id="pref-history"></html:h2></label>
     <checkbox
@@ -270,14 +218,17 @@
       native="true"
       preference="__prefsPrefix__.reuseTranslation"
     />
-    <label data-l10n-id="pref-history-hint"></label>
+    <html:p class="dbt-hint" data-l10n-id="pref-history-hint"></html:p>
   </groupbox>
-
+  </html:section>
+  <html:section id="__addonRef__-panel-about" role="tabpanel" aria-labelledby="__addonRef__-tab-about" hidden="hidden">
   <groupbox>
     <label><html:h2 data-l10n-id="pref-about"></html:h2></label>
-    <label
+    <html:p class="dbt-hint"
       data-l10n-id="pref-about-version"
       data-l10n-args='{"name":"__addonName__","version":"__buildVersion__","time":"__buildTime__"}'
-    ></label>
+    ></html:p>
   </groupbox>
+  </html:section>
+</html:div>
 </vbox>

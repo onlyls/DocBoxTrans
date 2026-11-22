@@ -6,8 +6,9 @@ const { webcrypto } = require("node:crypto");
 const root = path.resolve(__dirname, "..");
 const bundles = new Map();
 
-async function compile(realPane = false) {
-  if (!bundles.has(realPane)) bundles.set(realPane, build({
+async function compile(realPane = false, realServices = false) {
+  const bundleKey = `${realPane}:${realServices}`;
+  if (!bundles.has(bundleKey)) bundles.set(bundleKey, build({
     stdin: {
       contents: `
         export * as store from './src/utils/historyStore';
@@ -24,6 +25,10 @@ async function compile(realPane = false) {
         export * as panes from './src/modules/historyPane';
         export * as readerState from './src/modules/readerState';
         export * as reader from './src/modules/reader';
+        export * as serviceConfig from './src/modules/serviceConfig';
+        export * as servicePreferences from './src/modules/servicePreferences';
+        export * as serviceVisibility from './src/modules/serviceVisibility';
+        export { services as registry } from './src/modules/services';
         export * as http from './src/utils/http';
         export * as text from './src/utils/text';
         export { ChatCompletionStream } from './src/modules/services/chatStream';
@@ -63,13 +68,13 @@ async function compile(realPane = false) {
         if (p.endsWith("/modules/preferenceWindow.ts")) return { contents:
           'export const registerPrefsWindow = () => {}; export const registerPrefsScripts = () => {};',
         };
-        if (p.endsWith("/modules/services/index.ts")) return { contents:
-          'export const services = {getById: id => globalThis.testServices.get(id), getAll: () => [...globalThis.testServices.values()], getDisplayName: id => id};',
+        if (!realServices && p.endsWith("/modules/services/index.ts")) return { contents:
+          'export const services = {getById: id => globalThis.testServices.get(id), getAll: () => [...globalThis.testServices.values()], getVisible: () => [...globalThis.testServices.values()], getDisplayName: id => id};',
         };
       });
     } }],
   }).then((result) => result.outputFiles[0].text));
-  return bundles.get(realPane);
+  return bundles.get(bundleKey);
 }
 
 function deferred() {
@@ -98,6 +103,7 @@ async function fixture(t, options = {}) {
   const errors = [];
   const sections = new Map();
   const clipboard = [];
+  const appObservers = new Map();
   const barrier = { blocker: null, addBlocker(_name, blocker) { this.blocker = blocker; },
     removeBlocker(blocker) { if (this.blocker === blocker) this.blocker = null; } };
   const host = {
@@ -123,7 +129,13 @@ async function fixture(t, options = {}) {
       HTTP: { request: async () => { throw new Error("Unexpected network request"); } },
       debug() {}, logError: error => errors.push(error), getMainWindows: () => [],
     },
-    Services: { prompt: { confirm: () => false } },
+    Services: { prompt: { confirm: () => false }, obs: {
+      addObserver(observer, topic) {
+        if (!appObservers.has(topic)) appObservers.set(topic, new Set());
+        appObservers.get(topic).add(observer);
+      },
+      removeObserver(observer, topic) { appObservers.get(topic)?.delete(observer); },
+    } },
     IOUtils: {
       profileBeforeChange: barrier,
       exists: async () => disk.text !== null,
@@ -158,10 +170,10 @@ async function fixture(t, options = {}) {
     addon: { data: { translate: { queue: [] }, alive: true }, hooks: { onReaderPopupRefresh() {} } },
   };
   host.module = { exports: host.exports };
-  vm.runInNewContext(await compile(Boolean(options.realPane)), host, { filename: "regression-tests.cjs" });
+  vm.runInNewContext(await compile(Boolean(options.realPane), Boolean(options.realServices)), host, { filename: "regression-tests.cjs" });
   const api = host.module.exports;
-  t.after(() => { api.tasks.stopTranslationTasks(); for (const timer of timers) clearTimeout(timer); });
-  return { ...api, host, prefs, disk, services, events, barrier, errors, sections, clipboard };
+  t.after(() => { api.tasks.stopTranslationTasks(); api.servicePreferences.disposeServicePreferences(); for (const timer of timers) clearTimeout(timer); });
+  return { ...api, host, prefs, disk, services, events, barrier, errors, sections, clipboard, appObservers };
 }
 
 function translationService(id, translate) {

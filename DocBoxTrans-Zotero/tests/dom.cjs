@@ -18,6 +18,7 @@ class Element {
   }
   appendChild(child) { child.remove(); this.children.push(child); child.parentElement = this; return child; }
   prepend(child) { child.remove(); this.children.unshift(child); child.parentElement = this; }
+  replaceChildren(...children) { this.textContent = ""; children.forEach(child => this.appendChild(child)); }
   remove() {
     if (this.parentElement) this.parentElement.children = this.parentElement.children.filter(child => child !== this);
     this.parentElement = null;
@@ -30,7 +31,7 @@ class Element {
   }
   removeEventListener(type, handler) { this.listeners.get(type)?.delete(handler); }
   dispatch(type, fields = {}) {
-    const event = { target: this, currentTarget: this, preventDefault() {}, stopPropagation() {}, ...fields };
+    const event = { target: this, currentTarget: this, preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {}, ...fields };
     for (const handler of [...(this.listeners.get(type) ?? [])]) handler(event);
   }
   matches(selector) {
