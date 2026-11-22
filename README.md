@@ -1,13 +1,13 @@
 # DocBoxTrans
 
 > 面向文献阅读的**划词翻译**工具集：桌面端打通稻壳阅读器，插件端打通 Zotero，共享同一套翻译引擎与「上下文增强翻译」能力。
-[![Zotero 中文社区 · 已收录](https://zotero-chinese.com/badges/listed.svg)](https://zotero-chinese.com/plugins/)
+
 本仓库包含两个子项目，二者面向不同的阅读场景，但采用一致的翻译服务与设计语言：
 
 | 子项目 | 平台 | 技术栈 | 说明 |
 | --- | --- | --- | --- |
 | [**DocBoxTrans**](DocBoxTrans/) | Windows 桌面 | C# / .NET Framework | 稻壳阅读器划词翻译：热键取词、结果浮窗、翻译历史、随稻壳启停 |
-| [**DocBoxTrans for Zotero**](DocBoxTrans-Zotero/) | Zotero 7+ 插件 | TypeScript | 在 Zotero 内置 PDF 阅读器中划词翻译、翻译记录侧栏、拼接翻译 |
+| [**DocBoxTrans for Zotero**](DocBoxTrans-Zotero/) <br>[![Zotero 中文社区 · 已收录](https://zotero-chinese.com/badges/listed.svg)](https://zotero-chinese.com/plugins/)| Zotero 7+ 插件 | TypeScript | 在 Zotero 内置 PDF 阅读器中划词翻译、翻译记录侧栏、拼接翻译 |
 
 > 注：Zotero 端插件声明支持 Zotero 7 及以上，但目前主要在 **Zotero 10** 上测试，对 Zotero 7 的完整兼容性尚待验证。
 
