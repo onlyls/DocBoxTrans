@@ -262,15 +262,24 @@ test("connection testing uses the current unsaved form and does not replace late
   assert.equal(ui.root.textContent.includes("test-ok"), false);
 });
 
-test("sidebar and multiple settings windows share visibility without overwriting a dirty model draft", async t => {
+test("sidebar plus opens service settings and multiple windows share visibility without overwriting a dirty model draft", async t => {
   const f = await fixture(t, { realServices: true }); f.serviceConfig.initializeServiceConfig();
   const a = mountSettings(f), b = mountSettings(f);
-  a.fill("name", "Private draft");
   const paneRoot = a.doc.createElement("div"); a.doc.body.appendChild(paneRoot);
-  let manager = f.serviceVisibility.buildServiceVisibility(a.doc, paneRoot);
+  let openedPane;
+  f.host.Zotero.Utilities.Internal = { openPreferences: id => { openedPane = id; } };
+  const manager = f.serviceVisibility.buildServiceManagerButton(a.doc);
   paneRoot.appendChild(manager);
-  manager.querySelectorAll("input")[0].checked = false;
-  manager.querySelectorAll("input")[0].dispatch("change");
+  assert.equal(manager.textContent, "+");
+  assert.equal(manager.getAttribute("aria-label"), "services-manage");
+  manager.dispatch("click");
+  assert.equal(openedPane, f.servicePreferences.preferencesPaneId);
+  assert.equal(a.get("panel-services").hidden, false);
+  assert.equal(paneRoot.querySelector("details"), null);
+  assert.equal(f.host.addon.data.translate.queue.length, 0);
+  a.fill("name", "Private draft");
+  const llm = a.get("service-list").querySelectorAll("input")[0];
+  llm.checked = false; llm.dispatch("change");
   assert.equal(a.get("service-list").querySelectorAll("input")[0].checked, false);
   assert.equal(b.get("service-list").querySelectorAll("input")[0].checked, false);
   assert.equal(a.get("profile-name").value, "Private draft");
@@ -279,9 +288,7 @@ test("sidebar and multiple settings windows share visibility without overwriting
   bing.focus();
   bing.checked = false; bing.dispatch("change");
   assert.equal(b.doc.activeElement, b.get("service-list").querySelectorAll("input")[2]);
-  manager = f.serviceVisibility.buildServiceVisibility(a.doc, paneRoot);
-  assert.equal(manager.querySelectorAll("input")[2].checked, false);
-  assert.equal(manager.open, true);
+  assert.equal(a.get("service-list").querySelectorAll("input")[2].checked, false);
   assert.equal(f.host.addon.data.translate.queue.length, 0);
   a.win.dispatch("unload");
   assert.equal(a.win.listeners.get("DOMWindowClose").size, 0);

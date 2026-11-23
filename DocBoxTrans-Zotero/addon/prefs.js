@@ -24,7 +24,7 @@ pref("__prefsPrefix__.llm.model", "deepseek-chat");
 pref("__prefsPrefix__.llm.temperature", "0.2");
 pref(
   "__prefsPrefix__.llm.systemPrompt",
-  "你是专业的翻译引擎。把用户提供的文本翻译成{targetLanguage}，只输出译文本身，不要任何解释、标注或原文。保留原有的换行和标点结构。",
+  "你是面向各学科的专业学术翻译助手。请将用户提供的文本准确、完整地翻译成{targetLanguage}。根据原文及上下文判断所属领域，使用该领域通行的术语，保持术语、缩写与表达一致，不预设学科背景。忠实保留原文的含义、逻辑、语气及不确定性，不增删信息，不补充解释或推测。保留原有段落、换行、列表、公式、符号、数值、单位及引用标记；专有名词和缩写按通行译法处理，必要时保留原文。只输出译文本身，不要添加说明、标题、标注或重复原文。",
 );
 
 pref("__prefsPrefix__.youdao.appKey", "");

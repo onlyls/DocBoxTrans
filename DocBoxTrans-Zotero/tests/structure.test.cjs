@@ -194,6 +194,14 @@ test("current-result sidebars keep each reader's result when updates arrive", as
   const sa = f.readerState.getReaderState(ra), sb = f.readerState.getReaderState(rb);
   sa.selectedText = "paper A"; sb.selectedText = "paper B";
   const pa = mountPane(f, a), pb = mountPane(f, b, 11);
+  const current = pa.root.querySelector(".docboxtrans-history-current");
+  const manager = current.querySelector(".docboxtrans-service-manager");
+  const selectedService = findButton(manager.parentElement, "llm");
+  assert.equal(manager.parentElement, current.children[0], "plus belongs to the service row");
+  assert.equal(current.querySelector("details"), null);
+  assert.equal(selectedService.getAttribute("aria-pressed"), "true");
+  assert.match(selectedService.style.cssText, /color:var\(--fill-primary, inherit\)/);
+  assert.doesNotMatch(selectedService.style.cssText, /color:#fff/);
   await f.hooks.onStartup();
   await f.tasks.runTranslationTask(f.actions.createNewTaskFromSelection(sa));
   await f.tasks.runTranslationTask(f.actions.createNewTaskFromSelection(sb));

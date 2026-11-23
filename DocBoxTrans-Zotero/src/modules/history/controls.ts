@@ -2,9 +2,11 @@ import { pillCss, PILL_PADDING_COMPACT, type PillVariant } from "../../utils/uiS
 
 // ---------------- 当前翻译（面板顶部） ----------------
 
-/** 服务切换胶囊的样式：当前服务实心高亮，其余浅色。 */
+/** 服务切换胶囊保持主题文字颜色，用浅色底和描边标记当前服务。 */
 function paneServiceBtnStyle(active: boolean): string {
-  return pillCss(active ? "accent" : "ghost", "0.75em");
+  return pillCss("ghost", "0.75em") +
+    ";color:var(--fill-primary, inherit);" +
+    (active ? "background:rgba(64,114,229,.16);border-color:var(--color-accent, #4072e5);" : "");
 }
 
 /** 药丸形按钮（与弹窗、服务胶囊同一套视觉语言）。 */

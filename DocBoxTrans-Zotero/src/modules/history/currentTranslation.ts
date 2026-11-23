@@ -6,7 +6,7 @@ import { getLastTask, cancelTranslationTask } from "../../utils/task";
 import * as combineStore from "../../utils/combineStore";
 import { applyDisabledStyle } from "../../utils/uiStyle";
 import { services } from "../services";
-import { buildServiceVisibility } from "../serviceVisibility";
+import { buildServiceManagerButton } from "../serviceVisibility";
 import { selectService } from "../serviceConfig";
 import { rerunWith, translateCombined, refreshCombineViews, addSelectionToCombine, forceRetranslate } from "../translationActions";
 import { buildCombineChip } from "../combineChips";
@@ -55,6 +55,7 @@ function refreshCurrent(root: HTMLElement, doc: Document, onChanged: () => void)
     const btn = doc.createElement("button");
     btn.type = "button";
     btn.textContent = services.getDisplayName(s.id);
+    btn.setAttribute("aria-pressed", String(s.id === current));
     btn.style.cssText = paneServiceBtnStyle(s.id === current) +
       "max-width:100%;white-space:normal;overflow-wrap:anywhere;";
     btn.addEventListener("click", (ev) => {
@@ -63,8 +64,8 @@ function refreshCurrent(root: HTMLElement, doc: Document, onChanged: () => void)
     });
     row.appendChild(btn);
   }
+  row.appendChild(buildServiceManagerButton(doc));
   box.appendChild(row);
-  box.appendChild(buildServiceVisibility(doc, root));
 
   // 拼接翻译：单行内「拼接模式 + 加入当前选区 + 清空 + 翻译（计数）+ 片段胶囊」
   box.appendChild(buildCombineArea(root, doc, scope, onChanged));

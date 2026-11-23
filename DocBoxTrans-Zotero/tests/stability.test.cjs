@@ -246,7 +246,8 @@ test("LLM uses task language and accepts temperature zero, including legacy and 
     return { status: 200, response: { choices: [{ message: { content: "translation" } }] } };
   };
   const legacy = "你是专业的翻译引擎。把用户提供的文本翻译成简体中文，只输出译文本身，不要任何解释、标注或原文。保留原有的换行和标点结构。";
-  for (const prompt of [legacy, "Translate to {targetLanguage}. Keep terminology."]) {
+  const custom = "Translate to {targetLanguage}. Keep terminology.";
+  for (const prompt of ["", legacy, legacy.replace("简体中文", "{targetLanguage}"), custom]) {
     f.prefs["llm.systemPrompt"] = prompt;
     const task = { raw: "原文", langto: "en" };
     const result = await f.LlmService.translate(task, []);
@@ -254,6 +255,8 @@ test("LLM uses task language and accepts temperature zero, including legacy and 
     assert.equal(body.temperature, 0);
     assert.match(body.messages[0].content, /Target language: en/);
     assert.doesNotMatch(body.messages[0].content, /\{targetLanguage\}|翻译成简体中文/);
+    if (prompt === custom) assert.ok(body.messages[0].content.startsWith("Translate to en. Keep terminology."));
+    else assert.match(body.messages[0].content, /面向各学科[\s\S]*不预设学科背景/);
     assert.equal(result.text, "translation");
   }
 });
